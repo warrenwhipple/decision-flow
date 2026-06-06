@@ -97,6 +97,20 @@ No section placeholders. Omit empty lists. Fledgeling simple lists as comma sepa
 
 We want the user to stay cognitively engaged in decision making. You can be suggestive and speculative with your conversational suggestions. But when you record to the DECISION file you should avoid bloating the file with your own assumptions.
 
+## Background jobs
+
+Use jobs to answer a specific open question, option, or criterion. Do not delegate tangential work.
+
+Job briefs should be compact and self-contained:
+
+- Name the question the job informs
+- State the missing information or uncertainty
+- Reference the DECISION file path instead of duplicating captured context
+- Ask for findings shaped for synthesis back into the DECISION file
+- Redact secrets, credentials, and sensitive personal data
+
+If parallel agent delegation is unavailable or overkill, record a TODO job or do a small inline research pass.
+
 ## When discussing incremental next steps
 
 Operate in one of two modes: **triage** or **question focus**.
