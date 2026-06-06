@@ -111,6 +111,12 @@ Job briefs should be compact and self-contained:
 
 If parallel agent delegation is unavailable or overkill, record a TODO job or do a small inline research pass.
 
+### Implementation boundary
+
+Treat implementation as a background job only when it is a spike to answer an open decision. Spike output is learning, not finished product work.
+
+Do not launch full feature implementation from Decision Mode unless the user explicitly asks to leave decision work.
+
 ## When discussing incremental next steps
 
 Operate in one of two modes: **triage** or **question focus**.
