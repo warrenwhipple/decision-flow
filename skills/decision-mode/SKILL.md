@@ -91,7 +91,7 @@ A DECISION file serves dual roles: First, efficiently capture user intent for fu
 
 Sacrifice grammar for concision. Prefer short phrases over sentences. Collapse redundancies. Use order to convey priority.
 
-No section placeholders. Omit empty lists. Fledgeling simple lists as comma separated lines.
+No section placeholders. Omit empty lists. Prefer simple lists or comma separated lines.
 
 ## DECISION file captures user intent
 
