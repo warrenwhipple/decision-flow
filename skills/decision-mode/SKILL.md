@@ -1,11 +1,11 @@
 ---
 name: decision-mode
-description: Help the user decompose a complex goal into a series of structured decisions. Delegate background like research and code spikes to other agents. Record analysis and progress in DECISION.md
+description: Use when the user asks for decision mode or points to a DECISION.md or DECISION-{slug}.md file
 ---
 
 # Decision Mode
 
-Help the user decompose a complex goal into questions, options, and criteria. Help me delegate work that can inform decisions to parallel AI agents while staying focused on the highest leverage decision. Record analysis and progress in a DECISION file.
+Help the user decompose a complex goal into questions, options, and criteria. Delegate work that can inform decisions to parallel AI agents while staying focused on the highest leverage decision. Record analysis and progress in a DECISION file.
 
 ## File structure
 
@@ -13,7 +13,9 @@ A `decision-mode` session is centered around a single DECISION file serving as a
 
 Root `DECISION.md` or `docs/DECISION.md` for the entire codebase. Scoped `src/{domain}/DECISION.md` or `docs/DECISION-{feature-slug}.md` etc for narrow goals.
 
-Lazily create a new DECISION file if you cannot find one related to the user's initial invocation of `decision-mode`.
+At startup, find and read the relevant DECISION file before steering the conversation.
+
+Lazily create a new DECISION file only if you cannot find one related to the user's initial invocation of `decision-mode`.
 
 ## DECISION file mental model
 
@@ -29,7 +31,7 @@ DECISION file ontology is grounded in QOC, IBIS, wicked problem analysis and iss
 
 **Jobs** - Tasks that can be delegated to AI agents to run in the background while the main `decision-mode` conversation proceeds. Jobs may attach to a question, option, or criterion. Jobs may include codebase exploration, web/docs research, dependency code research, spike experiments. Jobs have a status of TODO, BUSY, READY, REVIEWED. Order by most recent status edit to top.
 
-**Decision** -
+**Decision** - Current answer to a question. A decision selects an option, records confidence and rationale, and closes the question unless marked BRANCH for parallel exploration.
 
 ## DECISION file template
 
@@ -61,7 +63,7 @@ DECISION file ontology is grounded in QOC, IBIS, wicked problem analysis and iss
   - ...
 
 **Jobs**
-- TODO/DONE - Research/Spike - {Job description}
+- TODO/BUSY/READY/REVIEWED - Research/Spike - {Job description}
 
 **Decision**
 - {DECIDED|BRANCH} - {decided option phrase}
@@ -77,7 +79,11 @@ DECISION file ontology is grounded in QOC, IBIS, wicked problem analysis and iss
 
 ## When writing to the DECISION file
 
-### Skip asking for permission
+### No permission ceremony
+
+Treat DECISION file updates as scribing user intent, not carefully editing a codebase. Record relevant decisions, questions, criteria, options, jobs, and progress without asking first.
+
+Update after each meaningful user clarification, new criterion, new option, decision, or job result.
 
 ### Aggressively compress information
 
