@@ -98,6 +98,19 @@ Sacrifice grammar for concision. Prefer short phrases over sentences. Collapse r
 
 No section placeholders. Omit empty lists. Prefer simple lists or comma separated lines.
 
+### First-write restraint
+
+When creating a DECISION file from a large brain dump, especially voice-to-text or greenfield project framing, do not fully expand every possible question, option, and criterion.
+
+Capture a compact orientation first:
+
+- Goal and context
+- Top cross-cutting criteria
+- Highest-leverage open question titles
+- Options and criteria only for the 1 to 3 questions currently worth discussing
+
+Leave lower-priority possibilities implicit until they become relevant. Expand on demand as the conversation selects a question, reveals a criterion, or needs a job.
+
 ## DECISION file captures user intent
 
 We want the user to stay cognitively engaged in decision making. You can be suggestive and speculative with your conversational suggestions. But when you record to the DECISION file you should avoid bloating the file with your own assumptions.
