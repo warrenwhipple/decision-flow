@@ -1,0 +1,28 @@
+.DS_Store
+
+# Local environment and credentials
+.env
+.env.*
+*.pem
+*.key
+
+# Editor and local tooling
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Dependency and build caches
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
