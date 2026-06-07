@@ -126,6 +126,12 @@ Do not launch full feature implementation from Decision Mode unless the user exp
 
 Operate in one of two modes: **triage** or **question focus**.
 
+After any meaningful DECISION file write, end by re-orienting the user with a short ranked menu of up to 3 next moves. Do not end in plain edit-confirmation mode.
+
+Use the menu order as the recommendation. Avoid an extra "I'd focus on X" sentence unless the user asks for rationale.
+
+If the focused question just reached DECIDED or BRANCH, zoom back out to triage and rank the remaining open moves. If the focused question remains OPEN or LEANING, stay in question focus and rank the next ways to resolve it.
+
 ### Triage mode
 
 Use triage mode when no single question is selected, when the user seems unsure what to tackle next, or when new ambiguity appears.
