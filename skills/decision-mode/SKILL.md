@@ -31,7 +31,11 @@ DECISION file ontology is grounded in QOC, IBIS, wicked problem analysis and iss
 
 **Jobs** - Tasks that can be delegated to AI agents to run in the background while the main `decision-mode` conversation proceeds. Jobs may attach to a question, option, or criterion. Jobs may include codebase exploration, web/docs research, dependency code research, spike experiments. Jobs have a status of TODO, BUSY, READY, REVIEWED. Order by most recent status edit to top.
 
-**Decision** - Current answer to a question. A decision selects an option, records confidence and rationale, and closes the question unless marked BRANCH for parallel exploration.
+**Decision** - Current answer to a question. A decision records status, selected option or branch set, confidence, and rationale.
+
+Decision status is OPEN, LEANING, DECIDED, or BRANCH. Confidence is TENTATIVE or SURE.
+
+If a TODO, BUSY, or READY job informs a question, that question can be LEANING at most, never DECIDED. A spike or research job is evidence toward a decision, not the decision itself.
 
 ## DECISION file template
 
@@ -66,10 +70,11 @@ DECISION file ontology is grounded in QOC, IBIS, wicked problem analysis and iss
 - TODO/BUSY/READY/REVIEWED - Research/Spike - {Job description}
 
 **Decision**
-- {DECIDED|BRANCH} - {decided option phrase}
+- Status - {OPEN|LEANING|DECIDED|BRANCH}
+- Choice - {current option phrase, decided option phrase, or unresolved}
   - {branch option phrase} - {git branch}
   - ...
-- Leaning SURE/TENTATIVE
+- Confidence - {TENTATIVE|SURE}
 - Why - {Explanation}
 
 ## {Question title}
