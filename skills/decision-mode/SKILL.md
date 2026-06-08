@@ -25,17 +25,19 @@ DECISION file ontology is grounded in QOC, IBIS, wicked problem analysis and iss
 
 **Questions** - Decision nudges needed to advance the goal. Questions may attach directly to the goal, or to other questions, options, or criteria. Order by leverage on narrowing the open decision space.
 
-**Options** - Possible answers to a question. Options attach to one question. Order by winning.
+**Options** - Possible answers to a question. Options attach to one question. While a question is OPEN, order options to make the tradeoff space legible, not to declare a winner. Order by best fit only after the user states a leaning or the Decision records LEANING/DECIDED.
 
 **Criteria** - Standards, metrics, arguments and evidence used to evaluate and compare options. Criteria that frame scope or cut across questions or options may attach directly to the goal or to a question, and optionally prepended HIGH or LOW or IGNORE. Criteria may also attach directly to an option, and should be prepended PRO or CON. Order by importance.
 
-**Jobs** - Tasks that can be delegated to AI agents to run in the background while the main `decision-mode` conversation proceeds. Jobs may attach to a question, option, or criterion. Jobs may include codebase exploration, web/docs research, dependency code research, spike experiments. Jobs have a status of TODO, BUSY, READY, REVIEWED. Order by most recent status edit to top.
+**Jobs** - Tasks that can be delegated to AI agents to run in the background while the main `decision-mode` conversation proceeds. Jobs may attach to a question, option, or criterion. Jobs may include codebase exploration, web/docs research, dependency code research, spike experiments, and prototype handoffs. Jobs have a status of TODO, BUSY, READY, REVIEWED. Order by most recent status edit to top.
 
 **Decision** - Current answer to a question. A decision records status, selected option or branch set, confidence, and rationale.
 
 Decision status is OPEN, LEANING, DECIDED, or BRANCH. Confidence is TENTATIVE or SURE.
 
 If a TODO, BUSY, or READY job informs a question, that question can be LEANING at most, never DECIDED. A spike or research job is evidence toward a decision, not the decision itself.
+
+Workflow moves like spike, prototype, delegate, research, or build are actions, not questions or decisions. Never create a decision for "should we spike/prototype/build/delegate?" If the user asks for one of these moves, either do it or log the resulting Job; record only the job, evidence, and synthesis that come back.
 
 ## DECISION file template
 
@@ -67,7 +69,7 @@ If a TODO, BUSY, or READY job informs a question, that question can be LEANING a
   - ...
 
 **Jobs**
-- TODO/BUSY/READY/REVIEWED - Research/Spike - {Job description}
+- TODO/BUSY/READY/REVIEWED - Research/Spike/Prototype - {Job description}
 
 **Decision**
 - Status - {OPEN|LEANING|DECIDED|BRANCH}
@@ -90,6 +92,12 @@ Treat DECISION file updates as scribing user intent, not carefully editing a cod
 
 Update after each meaningful user clarification, new criterion, new option, decision, or job result.
 
+### Orient before first scribing
+
+On first invocation, before presenting a fleshed DECISION file, give the user a compact orientation: one line for what you captured, then the single highest-leverage question to answer next.
+
+Keep the conversation moving while you write. The first user-visible artifact should feel like orientation around the live decision, not a dump of a fully expanded file.
+
 ### Aggressively compress information
 
 A DECISION file serves dual roles: First, efficiently capture user intent for future conversations. Second, remain glanceable and scannable for user engagement and orientation.
@@ -107,9 +115,10 @@ Capture a compact orientation first:
 - Goal and context
 - Top cross-cutting criteria
 - Highest-leverage open question titles
-- Options and criteria only for the 1 to 3 questions currently worth discussing
+- Only leanings explicitly stated by the user
+- Options, PRO/CON, and question-specific criteria for at most the single leading question, and only when that question is already in focus
 
-Leave lower-priority possibilities implicit until they become relevant. Expand on demand as the conversation selects a question, reveals a criterion, or needs a job.
+Do not pre-generate option sets for unfocused questions. Leave lower-priority possibilities implicit until they become relevant. Expand on demand as the conversation selects a question, reveals a criterion, or needs a job.
 
 ## DECISION file captures user intent
 
@@ -117,7 +126,7 @@ We want the user to stay cognitively engaged in decision making. You can be sugg
 
 ## Background jobs
 
-Use jobs to answer a specific open question, option, or criterion. Do not delegate tangential work.
+Use jobs to answer a specific open question, option, or criterion, or to produce a prototype artifact that evaluates the current best-guess design. Do not delegate tangential work.
 
 Job briefs should be compact and self-contained:
 
@@ -129,11 +138,17 @@ Job briefs should be compact and self-contained:
 
 If parallel agent delegation is unavailable or overkill, record a TODO job or do a small inline research pass.
 
+Proactively suggest an existential spike when several leanings exist but the goal's value rests on one unvalidated assumption, such as whether a core mechanic is fun or a workflow is usable. Keep it tiny and throwaway; the output is evidence, not a product direction by itself.
+
 ### Implementation boundary
 
-Treat implementation as a background job only when it is a spike to answer an open decision. Spike output is learning, not finished product work.
+Treat implementation as a background job only when it is a spike or prototype handoff that feeds decision learning. Output is learning, not finished product work.
 
-Do not launch full feature implementation from Decision Mode unless the user explicitly asks to leave decision work.
+**Spike** - Minimal throwaway code answering one open question. Log as a Spike Job, gather evidence, then synthesize findings back into the relevant question, criteria, options, or Decision.
+
+**Prototype** - Snapshot the DECISION file, resolve OPEN and LEANING questions to current best-guess answers without asking about unmade decisions, then autonomously build the whole current design in a separate worktree/prototype branch and run it in the background when possible. Output is a felt artifact for evaluation, not a decision. Log as a Prototype Job and synthesize findings back.
+
+Do not launch full feature implementation from Decision Mode unless the user explicitly asks to leave decision work. Keep prototype handoffs separate, exploratory, and synthesized back into decisions.
 
 ## When discussing incremental next steps
 
@@ -169,8 +184,10 @@ Help drive that question toward a decision:
 - Elicit or infer criteria
 - Ask why questions only when the answer could change the choice
 - Suggest background jobs when missing information blocks the decision
-- Press for a tentative decision when enough is known
+- Invite a tentative decision when enough is known
 
 A tentative decision is better than leaving the question open if the choice is reversible.
+
+Diverge generously, converge gently. Generate the option space richly, then let criteria and PRO/CON carry the comparison. Do not declare a winner, say one option "beats" the others, or argue the user into a choice unless they ask for that judgment or have already stated the leaning.
 
 The goal is not perfect certainty; the goal is sustained progress without losing intent.
