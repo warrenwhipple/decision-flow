@@ -231,3 +231,48 @@ Conclusion: build a custom lightweight React prototype. Borrow the broad scrolly
 ## Final User Intent In One Sentence
 
 Prototype a React single-page blog article where explicit narrative beats control a dense interactive timeline sidecar, using a 30-event web publishing history dataset and a toggle between marks and cards views.
+</handoff-doc>
+
+2026-06-08 15:03
+
+okay, I analyzed these notes above this time stamp with ChadGBT and Claude and asked if they thought I should try the handoff skill and I considered it. And yeah, or if I should prototype this thing. Yes, I am prototyping it. Yeah, I guess the big decision was whether or not to try Matt Pocock's `prototype` skill and I went in and read over it, and it has some stuff about multiple UIs and logic and data models, and it wasn't clear to me that it knew what to do with completely greenfield prototypes. yeah, I just decided it would be easiest to give it a simpler instruction, and it looks like this
+
+> Let's build this prototype so I can feel it out. We don't need tests. We just need this work enough that I get a feel for it and have feedback. /private/tmp/timeline-tool-prototype-handoff.md
+
+which is a little leaning into Matt's like raw grill me skill yeah it's interesting we were discussing using the Grow with Docs skill and whether or not that's useful or not and I do feel like Grow with Docs loads a lot of I mean I guess he's focusing one on green field and then one on brown field but yeah Grow with Docs sort of like builds in all this stuff about essentially domain driven design. language and ubiquitous language and then also ADR practice and then and then I guess Grill Me is it only those three things I don't know maybe that those are good and they should always be imposed on a brownfield repo and a greenfield repo doesn't need that it's an interesting question
+
+anyway, I fired off this handoff with a little, you know, this is not production code prompt up there, into Codex. I put it on a work tree. Because I'm curious what's in. Let me go look what's in the work tree. I don't know. I assume the work tree leaves uncommitted code out I never had any code. I just had that hand off so it doesn't doesn't even matter
+
+it's been going for five minutes I'm inclined to go back to the the grill me session and just keep going
+
+okay, so I went back to my original conversation and I realized it said this hilarious thing
+
+> Created the handoff here:
+>
+> timeline-tool-prototype-handoff.md
+>
+> I also launched a worker side agent, **Bernoulli** (019ea855-a99b-7db3-aeb5-e1710c2b2157), with that handoff as the prototype brief.
+
+and presumably Codex Mac app has subagents and it decided to launch a subagent to like prototype a thing. And it wrote that thing on to the main branch you know not in a work tree curiously. but this is interesting. Honestly, this is surprising. So this seems to be a phenomenon of mashing together Matt's handoff skill with the current implementation of Codex, while Matt had written it for Claude Code, right? And so Codex is… interpreting something about our conversation and whatever's in the handoff skill to it interpreted that as like I should launch a subagent that does this but it didn't put it in a work tree. It was an empty repo so it's fairly safe like it was doing work that not like wouldn't have doesn't doesn't break anything there wasn't any work going on maybe it looked to check. May who knows what it was thinking I need to research this automatic curated worker side agent I need to research these worker side agents and understand why when Codex decides to do this I notice that I can click the sub agent in the Codex UI Shows the sub-agent conversation which I think I don't think you can do that with Claude code, but maybe you can't I don't know what you can do with them anyway. This is super fascinating It worked for 13 minutes and 15 seconds, so I guess the yeah interesting I created a React Vite app and installed stuff and there's a web preview. And it wrote 12 files and 1600 lines. And there's an app that I can preview inside of Codex, even
+
+ so this is quite cool. Right I mean I'm looking at the app and it's not amazing but that's fine it's like basically you know adheres to our spec as far as we talked about it like like the mechanics of doing this were fine. In my experience I'd be a little annoyed if there was live code in the on main and then it went and wrote a bunch of stuff when really what I wanted it to do was I think start a work tree maybe that doesn't matter yeah it's funny. I mean I can always change the branch name now and commit it and then go back to main and then open it at a work tree yeah so the ergonomics around this aren't perfect. But Matt did not design Handoff for Codex. Yeah probably it requires some tweaking.  yeah it looks okay so I just did some research well I got ChatGPT to do some research and read through the codex docs and the guess which seems likely is that the word handoff is being overloaded here and that the open AI team has built in the word handoff into codex  it spawns a worker agent when you say handoff. And yeah, I also saw that word, like if on a work tree, if you click on a work tree in the UI, it has a little thing on the side called a handoff. Yeah. It's curious what this is. So yeah, it looks like Matt's word handoff and Codex's word handoff might be a little overloaded here
+
+ what does this mean for my experimentation? Right. We got to a prototype app. I do have reactions on it. The main reactions I have looking at this prototype app is like annoyance at the UI. Like at the UI decisions that Codex made, but like, I don't know, like that's just a matter of iterating and iterating. And I don't think I should focus in on them. It seemed to. Like mechanically do what I said, which is what I wanted. So that's, that's the important bit 
+
+ so what is the greater lesson here? The value prop in decision flow is that you stop feeling like a manager of agents and instead feel like you are honed in on a workflow where you're systematically taking off high leverage decisions and that that doesn't require a lot of context switching, like they can keep you in the same mental deep work focus without your attention wandering to other things 
+
+ so what do we have here? We have I asked codex with grill me loaded up to do a handoff and it kind of just did a prototype it didn't do it in a work tree would it have yeah and then I can look at that prototype but it was you know I don't it was on the same thread. Like it should have broken it out into a work tree 
+
+ yeah, I'm trying to press forward into what the takeaway message here is. There is some tooling in Codex that looks like it might be able to be contorted to do what I want, which is like make work trees, launch side agent. It's to do parallel throw away work. It feels like that is there. Matt Pocock's hand off skill doesn't know how to do that with Codex right but probably could be tweaked to do it. But  I guess I'll say the UI in codex is not designed around like it links that subagent to a conversation like it's just floating in a little context and a little menu bar on the whole conversation it's not clear to me there wasn't linked it's not linked to a decision right I guess this though isn't supposed to be linked to a decision this is my prototype go button right? Prototype Go button is not linked to a decision it's linked to a snapshot of the decision document 
+
+ question, does Codex link snapshots? I guess there's no decision document. There's a handoff document, and there's the conversation transcript itself. Yeah, it feels like the pieces are floating around, but they're not all there. And I don't know if I can solve this with just like writing a better skill file for decision mode 
+
+ I am turning this ethnography about using grill me into speculation of what to work on with decision mode next. I think I need to feed this in to an AI and we need to figure out what to do next
+
+Before that I'm gonna go back to my like the work tree that I manually broke off on my own before I realized that Codex had done it automatically 
+
+Looking at the timer it looks like it worked for thirteen minutes and three seconds and I can also open and view it 
+
+For a second there, I thought it was the same one it's not. It's just very for some reason they chose the exact same colors not sure why that was but the UI is subtly different and then yeah works differently but yeah I mean it basically is what I asked for and is terrible in many ways almost. slightly different ways than the other ones terrible sorry I shouldn't they're quite impressive that they were able to do this from just some talking 
+
+Yeah anyway the point the next conclusion is both of these worked sort of like Matt's manually mode worked and then curiously automatically triggered a kind of automatic thing inside of codex that acted weird yeah these are things to think on all right time to think together with the AI's. What do I what lesson do I take from this
