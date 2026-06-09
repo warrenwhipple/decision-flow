@@ -29,15 +29,19 @@ DECISION file ontology is grounded in QOC, IBIS, wicked problem analysis and iss
 
 **Criteria** - Standards, metrics, arguments and evidence used to evaluate and compare options. Criteria that frame scope or cut across questions or options may attach directly to the goal or to a question, and optionally prepended HIGH or LOW or IGNORE. Criteria may also attach directly to an option, and should be prepended PRO or CON. Order by importance.
 
-**Jobs** - Tasks that can be delegated to AI agents to run in the background while the main `decision-mode` conversation proceeds. Jobs may attach to a question, option, or criterion. Jobs may include codebase exploration, web/docs research, dependency code research, spike experiments, and prototype handoffs. Jobs have a status of TODO, BUSY, READY, REVIEWED. Order by most recent status edit to top.
+**Jobs** - Tasks that can be delegated to AI agents to run in the background while the main `decision-mode` conversation proceeds. Jobs may attach to a question, option, or criterion. Jobs may include codebase exploration, web/docs research, dependency code research, spike experiments, and rehearsal handoffs. Jobs have a status of TODO, BUSY, READY, REVIEWED. Order by most recent status edit to top.
 
-**Decision** - Current answer to a question. A decision records status, selected option or branch set, confidence, and rationale.
+**Decision** - Current answer to a question. A decision records status, encoding, selected option or branch set, confidence, and rationale.
 
 Decision status is OPEN, LEANING, DECIDED, or BRANCH. Confidence is TENTATIVE or SURE.
 
+Decision encoding is orthogonal to status. Status is epistemic; encoding tracks whether the decision has materialized in code: NOT_ENCODED (default), REHEARSED (materialized in a throwaway rehearsal artifact), ENCODED (landed in real implementation). Mark ENCODED only when the decision is observed in the real codebase or confirmed by the user, never from a rehearsal artifact. Omit the encoding line for decisions that don't manifest in code.
+
+The **frontier** is the set of decisions with Status DECIDED and Encoding NOT_ENCODED — decided but not yet expressed in code. When selecting work for a rehearsal, prioritize decided > leaning > open, and slice to the minimal relevant set.
+
 If a TODO, BUSY, or READY job informs a question, that question can be LEANING at most, never DECIDED. A spike or research job is evidence toward a decision, not the decision itself.
 
-Workflow moves like spike, prototype, delegate, research, or build are actions, not questions or decisions. Never create a decision for "should we spike/prototype/build/delegate?" If the user asks for one of these moves, either do it or log the resulting Job; record only the job, evidence, and synthesis that come back.
+Workflow moves like spike, rehearsal, delegate, research, or build are actions, not questions or decisions. Never create a decision for "should we spike/rehearse/build/delegate?" If the user asks for one of these moves, either do it or log the resulting Job; record only the job, evidence, and synthesis that come back.
 
 ## DECISION file template
 
@@ -69,10 +73,11 @@ Workflow moves like spike, prototype, delegate, research, or build are actions, 
   - ...
 
 **Jobs**
-- TODO/BUSY/READY/REVIEWED - Research/Spike/Prototype - {Job description}
+- TODO/BUSY/READY/REVIEWED - Research/Spike/Rehearsal - {Job description}
 
 **Decision**
 - Status - {OPEN|LEANING|DECIDED|BRANCH}
+- Encoding - {NOT_ENCODED|REHEARSED|ENCODED}
 - Choice - {current option phrase, decided option phrase, or unresolved}
   - {branch option phrase} - {git branch}
   - ...
@@ -126,7 +131,7 @@ We want the user to stay cognitively engaged in decision making. You can be sugg
 
 ## Background jobs
 
-Use jobs to answer a specific open question, option, or criterion, or to produce a prototype artifact that evaluates the current best-guess design. Do not delegate tangential work.
+Use jobs to answer a specific open question, option, or criterion, or to rehearse the decided-but-unencoded frontier into a runnable artifact. Do not delegate tangential work.
 
 Job briefs should be compact and self-contained:
 
@@ -142,13 +147,26 @@ Proactively suggest an existential spike when several leanings exist but the goa
 
 ### Implementation boundary
 
-Treat implementation as a background job only when it is a spike or prototype handoff that feeds decision learning. Output is learning, not finished product work.
+Treat implementation as a background job only when it is a spike or rehearsal handoff that feeds decision learning. Output is learning, not finished product work.
 
-**Spike** - Minimal throwaway code answering one open question. Log as a Spike Job, gather evidence, then synthesize findings back into the relevant question, criteria, options, or Decision.
+**Spike** - Minimal throwaway code answering one OPEN or LEANING question. Log as a Spike Job, gather evidence, then synthesize findings back into the relevant question, criteria, options, or Decision. A spike produces evidence toward a decision, not the decision itself.
 
-**Prototype** - Snapshot the DECISION file, resolve OPEN and LEANING questions to current best-guess answers without asking about unmade decisions, then autonomously build the whole current design in a separate worktree/prototype branch and run it in the background when possible. Output is a felt artifact for evaluation, not a decision. Log as a Prototype Job and synthesize findings back.
+**Rehearsal** - Snapshot the DECISION file, select a slice of the frontier (DECIDED ∧ NOT_ENCODED, minimal relevant set), then autonomously build that slice in a separate worktree/rehearsal branch and run it in the background when possible. Output is a felt, runnable artifact plus a rehearsal report, not a decision. Log as a Rehearsal Job.
 
-Do not launch full feature implementation from Decision Mode unless the user explicitly asks to leave decision work. Keep prototype handoffs separate, exploratory, and synthesized back into decisions.
+Assumption guardrail: when a rehearsal needs an answer to an OPEN or LEANING question, resolve it to a temporary best-guess assumption without asking the user. Log each assumption in the rehearsal report and leave the question's status unchanged — "assumed SQLite for the rehearsal; question remains OPEN." A rehearsal never flips a decision status; only synthesis with the user does.
+
+A rehearsal ends in a short rehearsal report covering:
+
+- Which decisions materialized — mark these REHEARSED on synthesis
+- Which assumptions were made for open/leaning questions
+- What contradicted the recorded design
+- What new questions appeared
+- What felt good or bad in the running artifact
+- What is salvageable
+
+Synthesize the report back into the DECISION file: update encodings, log assumptions and new questions, and surface contradictions to the user — a contradiction may reopen a DECIDED question, but only the user reopens it.
+
+Do not launch full feature implementation from Decision Mode unless the user explicitly asks to leave decision work. Keep rehearsal handoffs separate, exploratory, and synthesized back into decisions.
 
 ## When discussing incremental next steps
 
