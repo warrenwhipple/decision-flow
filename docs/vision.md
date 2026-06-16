@@ -59,13 +59,18 @@ This doc: Decision Flow notes and docs keep fanning out and sprawling. This "vis
 
 ## Kinds of work the background agents do
 
-- **Spike experiments** — throwaway code to answer a design question (XP "spike" in spirit — output is "we learned enough to choose," not "we built something")
+- **Spike experiments** — throwaway code to answer one unresolved design question (XP "spike" in spirit — output is evidence for a decision, not a product direction)
+- **Rehearsals** — throwaway implementation passes over already-decided parts of the decision record; output is a felt, runnable artifact plus a report on what materialized, what felt wrong, and what assumptions were needed
 - **Codebase research** — exploring existing code in the repo
 - **Internet/docs research** — reading docs, blogs, prior art, finding patterns or libraries
 - **Dependency code research** — downloading a dependency source and inspecting the code (see Amp "Librarian" and OpenCode "Scout")
 - **Prepare collaborator brief** — when a decision needs input from other humans, help get them up to speed for discussing the decision
 - **Prepare observability plan** — when a decision needs real world deploy, prepare a plan for A/B test or feature or reversible trial etc
 - All bounded by one criterion: must move the current decision/spec forward
+
+Spike vs rehearsal:
+- A spike points forward from uncertainty: "Can we learn enough to choose?"
+- A rehearsal points backward from decisions already recorded: "What happens if we try to enact this?"
 
 ## UI top-level ontology
 
