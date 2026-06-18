@@ -11,7 +11,7 @@ This repo currently contains `decision-mode`, a small Codex skill prototype for 
 Start here:
 
 - `skills/decision-mode/SKILL.md` - the prototype agent behavior
-- `thinking/vision.md` - product vision and rationale
+- `../../notes/thinking/topics/decision-flow/vision.md` - product vision and rationale
 - `docs/experience/` - timestamped dogfood notes and observations
 
 ## Decision Mode

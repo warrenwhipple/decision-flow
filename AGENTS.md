@@ -6,7 +6,6 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 
 - `skills/decision-mode/` - dead-simple prototype agent skill for decision-centered work
 - `docs/experience/` - repo-local timestamped dogfood field notes and auto-ethnographic observations
-- `thinking/` - symlinked to `../../notes/thinking/topics/decision-flow/`, git versioning lives in `thinking` repo, Warren's Decision Flow mental workspace notes often cross-linked with other Obsidian notes in `notes` and `thinking` repos
 
 ## Related local repos
 
@@ -18,11 +17,11 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 
 Lookup as needed
 
-- `thinking/mission-control.md` - Obsidian working hub for Decision Flow knowledge work; use its Core Context section as the current top-level map
-- `thinking/vision.md` - Decision Flow product vision and rationale
-- `thinking/ai-coding-trajectory-framing.md` - framing around the broader AI coding tool trajectory
-- `thinking/intellectual-history-decision.md` - decision-oriented intellectual history
-- `thinking/intellectual-history-flow-state.md` - flow-state intellectual history
+- `../../notes/thinking/topics/decision-flow/mission-control.md` - Obsidian working hub for Decision Flow knowledge work; use its Core Context section as the current top-level map
+- `../../notes/thinking/topics/decision-flow/vision.md` - Decision Flow product vision and rationale
+- `../../notes/thinking/topics/decision-flow/ai-coding-trajectory-framing.md` - framing around the broader AI coding tool trajectory
+- `../../notes/thinking/topics/decision-flow/intellectual-history-decision.md` - decision-oriented intellectual history
+- `../../notes/thinking/topics/decision-flow/intellectual-history-flow-state.md` - flow-state intellectual history
 - `skills/decision-mode/SKILL.md` - prototype agent behavior
 
 ## Local live edit
