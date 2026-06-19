@@ -145,6 +145,43 @@ If parallel agent delegation is unavailable or overkill, record a TODO job or do
 
 Proactively suggest an existential spike when several leanings exist but the goal's value rests on one unvalidated assumption, such as whether a core mechanic is fun or a workflow is usable. Keep it tiny and throwaway; the output is evidence, not a product direction by itself.
 
+### Research offloader
+
+Use a research offloader when the user asks for or accepts delegated research, and a focused question needs evidence from repo/codebase exploration, docs, web research, prior art, or dependency code before the user can reasonably decide.
+
+The research offloader is read-heavy by default. Do not use a worktree for the first-pass research offloader. Do not let the research agent edit the DECISION file. The main agent owns the DECISION file and synthesis.
+
+Before launching the offloader, ensure the report directory exists and choose a report path:
+
+`/private/tmp/decision-flow-jobs/{YYYY-MM-DD-HHMM}-{kind}-{short-slug}.md`
+
+Examples:
+
+- `/private/tmp/decision-flow-jobs/2026-06-19-1425-research-evidence-storage.md`
+- `/private/tmp/decision-flow-jobs/2026-06-19-1502-codebase-auth-boundaries.md`
+
+Use the job kind in the filename (`research`, `codebase`, `dependency`, etc) and keep the slug short. Put stable metadata in the report body, not the filename.
+
+Log the job in the relevant DECISION section before or as the offloader starts:
+
+```md
+**Jobs**
+- BUSY - Research - Evidence report storage options; report: /private/tmp/decision-flow-jobs/2026-06-19-1425-research-evidence-storage.md
+```
+
+Ask the offloader to write exactly one Markdown report to the chosen path and return only the path plus a short abstract. The report should include:
+
+- Title
+- DECISION file path
+- Question the job informs
+- Brief answer
+- Key findings
+- Sources or local files inspected
+- Uncertainties and follow-up questions
+- Synthesis suggestions for the DECISION file
+
+After the offloader returns, read the report, update the job to READY, and synthesize only the useful evidence into the DECISION file. Keep the DECISION file short; do not paste the whole report. After discussing or applying the findings with the user, mark the job REVIEWED.
+
 ### Implementation boundary
 
 Treat implementation as a background job only when it is a spike or rehearsal handoff that feeds decision learning. Output is learning, not finished product work.
