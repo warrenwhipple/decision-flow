@@ -17,6 +17,20 @@ At startup, find and read the relevant DECISION file before steering the convers
 
 Lazily create a new DECISION file only if you cannot find one related to the user's initial invocation of `decision-mode`.
 
+## DECISION file compatibility
+
+Current DECISION file schema: `0.2`.
+
+For newly created or intentionally migrated DECISION files, add a compact marker near the top:
+
+`<!-- decision-mode: schema=0.2; reviewed=YYYY-MM-DD -->`
+
+Version the DECISION file schema only for changes that affect file semantics or migration, such as new decision fields, status meanings, job status meanings, or whether workflow moves are represented as jobs instead of decisions. Do not treat normal conversation guidance, delegation guidance, or writing-style refinements as schema changes.
+
+When reading an existing DECISION file, check for the marker. If it is absent, infer the schema from the structure. Migrate only when a concrete mismatch would affect the current work. Do not churn old DECISION files solely to refresh formatting or add the marker.
+
+When migrating, make the smallest structural change that restores compatibility, preserve user intent, and update the marker. If a field like `Encoding` may be stale relative to the codebase, inspect the real implementation or ask the user before changing it.
+
 ## DECISION file mental model
 
 DECISION file ontology is grounded in QOC, IBIS, wicked problem analysis and issue mapping. But use terminology below to avoid collision with common software engineering and task management terms:
@@ -49,6 +63,8 @@ Workflow moves like spike, rehearsal, delegate, research, or build are actions, 
 # {Goal title}
 
 {Goal context and framing. 1 or 2 phrases.}
+
+<!-- decision-mode: schema=0.2; reviewed=YYYY-MM-DD -->
 
 {Optional issue tracker ref id or link}
 
