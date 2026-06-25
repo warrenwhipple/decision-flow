@@ -13,6 +13,19 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 - [`thinking`](../../notes/thinking) - Warren's personal method, templates, and notes for thinking with AI, nested git repo in `notes`
 - [`convergence`](../convergence) - Warren's personal focused work method
 
+## Dogfood repos
+
+These sibling repos are common places where Warren dogfoods `decision-mode`.
+When work in this repo needs examples, field notes, or live comparison points
+from actual use, look in these repos as needed:
+
+- [`blog`](../blog) - Warren's public blog, live now
+- [`convergence`](../convergence) - Warren's person focused work method, in use now
+- [`lightsight`](../lightsight) - star system game with distance delayed vision and control, early prototype
+- [`reversal-ledger`](../reversal-ledger) - ledger of various poublic commentator reversals on AI capability/risk, early prototype
+- [`timeline-tool`](../timeline-tool) - displays dynamic timelines for blog posts, early prototype
+- [`turtlefood`](../turtlefood) - LLM/harness evals for AI tools building AI tools, early prototype
+
 ## Helpful context
 
 Lookup as needed
