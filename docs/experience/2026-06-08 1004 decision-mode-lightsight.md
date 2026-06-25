@@ -1,5 +1,5 @@
 ---
-observed_at: 2026-06-08
+observed_at: 2026-06-08 10:04 EDT
 type: dogfood
 decision_flow_target: decision-mode
 dogfood_target: lightsight

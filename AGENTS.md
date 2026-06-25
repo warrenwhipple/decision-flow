@@ -8,11 +8,14 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 - `docs/experience/` - repo-local timestamped dogfood field notes and auto-ethnographic observations
 - `docs/reports/` - timestamped research and capability reports that synthesize findings from experiments
 
-## Related local repos
+## Building `decision-mode` skill
 
-- [`notes`](../../notes) - Warren's personal Obsidian notes vault
-- [`thinking`](../../notes/thinking) - Warren's personal method, templates, and notes for thinking with AI, nested git repo in `notes`
-- [`convergence`](../convergence) - Warren's personal focused work method
+Warren is actively building and iterating on `decision-mode`.
+But it is too early and confusing to run it on itself.
+Warren is using [`HITL.md`](HITL.md) (a human owned status file) to drive development.
+The `decision-mode` SKILL.md is symlinked into both Codex and Claude Code global user skills for dogfooding in OTHER repos.
+You may read the `decision-mode` SKILL.md, but do NOT invoke it directly here.
+Do NOT create a `DECISION.md` file here.
 
 ## Dogfood repos
 
@@ -26,6 +29,11 @@ from actual use, look in these repos as needed:
 - [`reversal-ledger`](../reversal-ledger) - ledger of various poublic commentator reversals on AI capability/risk, early prototype
 - [`timeline-tool`](../timeline-tool) - displays dynamic timelines for blog posts, early prototype
 - [`turtlefood`](../turtlefood) - LLM/harness evals for AI tools building AI tools, early prototype
+
+## Related docs and notes repos
+
+- [`notes`](../../notes) - Warren's personal Obsidian notes vault
+- [`thinking`](../../notes/thinking) - Warren's personal method, templates, and notes for thinking with AI, nested git repo in `notes`
 
 ## Helpful context
 

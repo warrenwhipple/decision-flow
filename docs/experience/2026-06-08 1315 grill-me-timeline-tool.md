@@ -1,5 +1,5 @@
 ---
-observed_at: 2026-06-08
+observed_at: 2026-06-08 13:15 EDT
 type: dogfood
 decision_flow_target: decision-mode
 dogfood_target: grill-me-on-timeline-tool

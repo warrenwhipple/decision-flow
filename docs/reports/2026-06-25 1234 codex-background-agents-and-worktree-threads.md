@@ -1,5 +1,5 @@
 ---
-observed_at: 2026-06-25
+observed_at: 2026-06-25 12:34 EDT
 type: capability-report
 surface: Codex Mac app
 topic: Codex background agents and worktree threads for decision-mode rehearsal jobs
