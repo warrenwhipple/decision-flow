@@ -161,6 +161,22 @@ If parallel agent delegation is unavailable or overkill, record a TODO job or do
 
 Proactively suggest an existential spike when several leanings exist but the goal's value rests on one unvalidated assumption, such as whether a core mechanic is fun or a workflow is usable. Keep it tiny and throwaway; the output is evidence, not a product direction by itself.
 
+### Live conversation rule
+
+The main `decision-mode` agent's first responsibility is keeping Warren in the live decision conversation. After launching background work, yield immediately unless the result is required for the next user-visible step. Do not call blocking wait or polling tools by default.
+
+If a background result is on the critical path, say that explicitly and use the shortest bounded wait that makes sense. Otherwise, record the job as BUSY, return to the decision conversation, and synthesize the result when it appears or when Warren asks to inspect it.
+
+### Codex delegation backends
+
+When Codex background tools are available, choose the backend by job type:
+
+- `spawn_agent` - Use for research, codebase exploration, dependency lookup, small checks, and other bounded non-worktree jobs. Expect completion to return through a sub-agent notification. Do not immediately call `wait_agent`; doing so blocks the main conversation. Close the agent after completion when no more interaction is needed.
+- `create_thread` in a worktree - Default for rehearsal implementation. Start a fresh Codex thread from a compact brief that points to the DECISION file and the exact frontier slice to rehearse. This gives the rehearsal an isolated checkout without copying the whole conversation.
+- `fork_thread` in a worktree - Use only when the rehearsal genuinely needs transcript context that has not yet been captured in the DECISION file. Forking copies completed conversation history; it should not substitute for a good DECISION-file handoff.
+
+For worktree threads, do not assume the parent thread will receive a completion notification. Record the pending worktree id, eventual thread id, worktree path, branch if known, and report path in the Job line. Inspect later with thread tools such as `list_threads` and `read_thread`, then mark the job READY only after reading the result.
+
 ### Research offloader
 
 Use a research offloader when the user asks for or accepts delegated research, and a focused question needs evidence from repo/codebase exploration, docs, web research, prior art, or dependency code before the user can reasonably decide.

@@ -6,6 +6,7 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 
 - `skills/decision-mode/` - dead-simple prototype agent skill for decision-centered work
 - `docs/experience/` - repo-local timestamped dogfood field notes and auto-ethnographic observations
+- `docs/reports/` - timestamped research and capability reports that synthesize findings from experiments
 
 ## Related local repos
 
