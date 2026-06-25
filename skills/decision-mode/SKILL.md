@@ -175,7 +175,7 @@ When Codex background tools are available, choose the backend by job type:
 - `create_thread` in a worktree - Default for rehearsal implementation. Start a fresh Codex thread from a compact brief that points to the DECISION file and the exact frontier slice to rehearse. This gives the rehearsal an isolated checkout without copying the whole conversation.
 - `fork_thread` in a worktree - Use only when the rehearsal genuinely needs transcript context that has not yet been captured in the DECISION file. Forking copies completed conversation history; it should not substitute for a good DECISION-file handoff.
 
-For worktree threads, do not assume the parent thread will receive a completion notification. Record the pending worktree id, eventual thread id, worktree path, branch if known, and report path in the Job line. Inspect later with thread tools such as `list_threads` and `read_thread`, then mark the job READY only after reading the result.
+For worktree threads, do not assume the parent thread will receive a completion notification. Record the pending worktree id, eventual thread id, worktree path, branch if known, and, when known, launch command or URL and sidecar path in the Job line. Inspect later with thread tools such as `list_threads` and `read_thread`, then mark the job READY only after reading the result.
 
 ### Research offloader
 
@@ -220,11 +220,30 @@ Treat implementation as a background job only when it is a spike or rehearsal ha
 
 **Spike** - Minimal throwaway code answering one OPEN or LEANING question. Log as a Spike Job, gather evidence, then synthesize findings back into the relevant question, criteria, options, or Decision. A spike produces evidence toward a decision, not the decision itself.
 
-**Rehearsal** - Snapshot the DECISION file, select a slice of the frontier (DECIDED ∧ NOT_ENCODED, minimal relevant set), then autonomously build that slice in a separate worktree/rehearsal branch and run it in the background when possible. Output is a felt, runnable artifact plus a rehearsal report, not a decision. Log as a Rehearsal Job.
+**Rehearsal** - Snapshot the DECISION file, select a slice of the frontier (DECIDED ∧ NOT_ENCODED, minimal relevant set), then autonomously build that slice in a separate worktree/rehearsal branch and run it in the background when possible. Output is a felt, runnable artifact plus a tiny synthesis sidecar, not a decision. The human-facing result is a try-it card, not a report. Log as a Rehearsal Job.
 
-Assumption guardrail: when a rehearsal needs an answer to an OPEN or LEANING question, resolve it to a temporary best-guess assumption without asking the user. Log each assumption in the rehearsal report and leave the question's status unchanged — "assumed SQLite for the rehearsal; question remains OPEN." A rehearsal never flips a decision status; only synthesis with the user does.
+Choose a sidecar path before launch, usually `/private/tmp/decision-flow-jobs/{YYYY-MM-DD-HHMM}-rehearsal-{short-slug}.md`. Keep sidecars outside the repo by default; they are working memory for synthesis, not project documentation.
 
-A rehearsal ends in a short rehearsal report covering:
+Assumption guardrail: when a rehearsal needs an answer to an OPEN or LEANING question, resolve it to a temporary best-guess assumption without asking the user. Log each assumption in the synthesis sidecar and leave the question's status unchanged — "assumed SQLite for the rehearsal; question remains OPEN." A rehearsal never flips a decision status; only synthesis with the user does.
+
+A rehearsal completion should optimize for immediate human trial. If the artifact can run, return a very short try-it card:
+
+```md
+Rehearsal ready: {short artifact name}
+
+Try: {URL or command}
+Look at: {1-2 things that test the decision}
+Probably broken: {1-3 known rough edges}
+
+After you try it:
+1. Keep exploring this direction
+2. Throw it away
+3. Ask what changed under the hood
+```
+
+If the artifact cannot run, say that plainly and give the shortest useful failure note plus the sidecar path.
+
+The synthesis sidecar is for the main decision-mode agent, not the user's first review surface. Keep it compact, usually 10-20 lines, covering:
 
 - Which decisions materialized — mark these REHEARSED on synthesis
 - Which assumptions were made for open/leaning questions
@@ -232,8 +251,9 @@ A rehearsal ends in a short rehearsal report covering:
 - What new questions appeared
 - What felt good or bad in the running artifact
 - What is salvageable
+- Launch command or URL, changed files, and likely breakage
 
-Synthesize the report back into the DECISION file: update encodings, log assumptions and new questions, and surface contradictions to the user — a contradiction may reopen a DECIDED question, but only the user reopens it.
+Synthesize the sidecar back into the DECISION file after human review or when the user asks: update encodings, log assumptions and new questions, and surface contradictions to the user — a contradiction may reopen a DECIDED question, but only the user reopens it.
 
 Do not launch full feature implementation from Decision Mode unless the user explicitly asks to leave decision work. Keep rehearsal handoffs separate, exploratory, and synthesized back into decisions.
 

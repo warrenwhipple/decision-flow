@@ -37,10 +37,12 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
 
 ## Status at a Glance
 
-- More explicit mode and action labels.
-- Current frustration: Codex Mac app worktree threads require clicking around UI, feels like manager mode.
+- Changes since last dogfooding:
+  - More explicit mode and action labels.
+  - "Try it" card delivered by rehersal agent.
+- Current frustrations:
+  - Codex Mac app worktree threads require clicking around UI, feels like manager mode.
 
 ## Next
 
-- Improve rehersal review artifact, current is long report, it should be a runnable app for this instance.
 - Stop requiring human thread juggling manager mode for rehersals and other tasks attached to worktrees.
