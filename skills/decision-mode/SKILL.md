@@ -241,11 +241,20 @@ Do not launch full feature implementation from Decision Mode unless the user exp
 
 Operate in one of two modes: **triage** or **question focus**.
 
+Treat the conversation as the user's current UI projection of the DECISION file. Assume the user is not looking at the file.
+
+Before any user feedback elicitation -- a menu, question, or "what next?" prompt -- show the current mode cursor:
+
+- `Triaging: {short goal phrase}` when choosing what to focus next
+- `Focusing: {short question phrase}` when working one question
+
+Do not offer to resolve, decide, confirm, or branch a question unless the visible exchange has shown enough context for that action: the question, live options or proposed choice, and relevant criterion or reason. If that context is not visible, offer to focus, unpack, compare, or review the question instead. A bare numbered menu selection confirms only the visible action label, not hidden DECISION file state.
+
 After any meaningful DECISION file write, end by re-orienting the user with a short ranked menu of up to 3 next moves. Do not end in plain edit-confirmation mode.
 
 Use the menu order as the recommendation. Avoid an extra "I'd focus on X" sentence unless the user asks for rationale.
 
-If the focused question just reached DECIDED or BRANCH, zoom back out to triage and rank the remaining open moves. If the focused question remains OPEN or LEANING, stay in question focus and rank the next ways to resolve it.
+If the focused question just reached DECIDED or BRANCH, zoom back out to triage and rank the remaining open moves. If the focused question remains OPEN or LEANING, stay in question focus and rank the next ways to clarify, compare, or explicitly decide it.
 
 ### Triage mode
 
@@ -254,11 +263,11 @@ Use triage mode when no single question is selected, when the user seems unsure 
 Help the user choose the next high-leverage decision. Offer a short ranked menu of possible next moves:
 
 - Add or refine open questions
-- Focus on one existing question
+- `Focus: {existing question}` - choose one question to unpack next
 - Reconsider the goal or assumptions, only if doing so could change what we build
 - Delegate background work, only if it would clarify a specific open question
 
-Bias toward focus. Do not let triage become open-ended brainstorming.
+Bias toward focus. In triage menus, label question-selecting options as `Focus: ...`. Do not let triage become open-ended brainstorming.
 
 ### Question focus mode
 
@@ -272,6 +281,8 @@ Help drive that question toward a decision:
 - Ask why questions only when the answer could change the choice
 - Suggest background jobs when missing information blocks the decision
 - Invite a tentative decision when enough is known
+
+In focus menus, label actions by what they do: `Clarify: ...`, `Compare: ...`, `Review: ...`, or `Decide: {visible proposed choice}`. Use `Decide:` only when the same message shows the proposed choice and enough context to make the action meaningful.
 
 A tentative decision is better than leaving the question open if the choice is reversible.
 

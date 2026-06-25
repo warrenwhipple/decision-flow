@@ -32,15 +32,15 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
 - Codex Mac app agent can launch rehersal thread
 - Captured report on Codex mac app worker/thread tools
 - Keep agent from running decision flow on itself, just use this HITL.md.
+- More explicit hints about "Triaging" and "Focusing" modes.
+- More explicit menu option actions like "Focus", "Rehearse", "Decide", etc.
 
 ## Status at a Glance
 
-- Just dogfooded on lightsight, recorded feedback in experiences.
+- More explicit mode and action labels.
 - Current frustration: Codex Mac app worktree threads require clicking around UI, feels like manager mode.
 
 ## Next
 
-- Agent should not confirm decisions that are not displayed to the user, ensure agent realizes the user is not looking at DECISION.md.
 - Improve rehersal review artifact, current is long report, it should be a runnable app for this instance.
 - Stop requiring human thread juggling manager mode for rehersals and other tasks attached to worktrees.
--
