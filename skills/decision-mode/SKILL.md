@@ -236,9 +236,9 @@ Look at: {1-2 things that test the decision}
 Probably broken: {1-3 known rough edges}
 
 After you try it:
-1. Keep exploring this direction
-2. Throw it away
-3. Ask what changed under the hood
+1. Dump feedback
+2. Iterate rehearsal
+3. Discard rehearsal
 ```
 
 If the artifact cannot run, say that plainly and give the shortest useful failure note plus the sidecar path.
@@ -248,18 +248,20 @@ The synthesis sidecar is for the main decision-mode agent, not the user's first 
 - Which decisions materialized — mark these REHEARSED on synthesis
 - Which assumptions were made for open/leaning questions
 - What contradicted the recorded design
-- What new questions appeared
+- Candidate new questions that appeared
 - What felt good or bad in the running artifact
 - What is salvageable
 - Launch command or URL, changed files, and likely breakage
 
-Synthesize the sidecar back into the DECISION file after human review or when the user asks: update encodings, log assumptions and new questions, and surface contradictions to the user — a contradiction may reopen a DECIDED question, but only the user reopens it.
+Do not add rehearsal-discovered questions directly to the main DECISION file before human review. Keep them as candidate questions in the sidecar, or surface them under `Possible new questions`. Promote them only when the user accepts them or gives feedback that clearly implies them.
+
+Synthesize the sidecar back into the DECISION file after human review or when the user asks: update encodings, log assumptions and accepted or implied new questions, and surface contradictions to the user — a contradiction may reopen a DECIDED question, but only the user reopens it.
 
 Do not launch full feature implementation from Decision Mode unless the user explicitly asks to leave decision work. Keep rehearsal handoffs separate, exploratory, and synthesized back into decisions.
 
 ## When discussing incremental next steps
 
-Operate in one of two modes: **triage** or **question focus**.
+Operate in one of three modes: **triage**, **question focus**, or **rehearsal review**.
 
 Treat the conversation as the user's current UI projection of the DECISION file. Assume the user is not looking at the file.
 
@@ -267,6 +269,7 @@ Before any user feedback elicitation -- a menu, question, or "what next?" prompt
 
 - `Triaging: {short goal phrase}` when choosing what to focus next
 - `Focusing: {short question phrase}` when working one question
+- `Reviewing: {short rehearsal artifact name}` when reacting to a runnable rehearsal
 
 Do not offer to resolve, decide, confirm, or branch a question unless the visible exchange has shown enough context for that action: the question, live options or proposed choice, and relevant criterion or reason. If that context is not visible, offer to focus, unpack, compare, or review the question instead. A bare numbered menu selection confirms only the visible action label, not hidden DECISION file state.
 
@@ -275,6 +278,8 @@ After any meaningful DECISION file write, end by re-orienting the user with a sh
 Use the menu order as the recommendation. Avoid an extra "I'd focus on X" sentence unless the user asks for rationale.
 
 If the focused question just reached DECIDED or BRANCH, zoom back out to triage and rank the remaining open moves. If the focused question remains OPEN or LEANING, stay in question focus and rank the next ways to clarify, compare, or explicitly decide it.
+
+After a try-it card or completed rehearsal, enter rehearsal review mode instead of generic triage until the user reacts, discards the artifact, or asks to return to broader triage.
 
 ### Triage mode
 
@@ -288,6 +293,33 @@ Help the user choose the next high-leverage decision. Offer a short ranked menu 
 - Delegate background work, only if it would clarify a specific open question
 
 Bias toward focus. In triage menus, label question-selecting options as `Focus: ...`. Do not let triage become open-ended brainstorming.
+
+If an unreviewed rehearsal is available, prefer `Review: {artifact}` over generic triage moves.
+
+### Rehearsal review mode
+
+Use rehearsal review mode after the user receives or tries a runnable rehearsal artifact. The user is reviewing a concrete artifact, not choosing a new abstract decision.
+
+Default to eliciting messy human reaction. Offer a short ranked menu like:
+
+```md
+Reviewing: {short rehearsal artifact name}
+
+1. Dump feedback - I will sort it into decisions, questions, and follow-up changes
+2. Iterate rehearsal - keep this worktree and adjust it
+3. Discard rehearsal - keep only what we learned
+```
+
+Treat code inspection as secondary. Offer `Inspect code details` only when the user asks or when code details are necessary to interpret feedback.
+
+While reviewing, sort feedback into:
+
+- Rehearsal changes to try in the same worktree
+- DECISION updates that capture human intent
+- Candidate questions that need explicit acceptance before becoming normal open questions
+- Contradictions or assumptions to surface back to the user
+
+Leave rehearsal review mode when the user discards the artifact, asks to iterate it, promotes it toward real implementation, or explicitly returns to triage.
 
 ### Question focus mode
 
