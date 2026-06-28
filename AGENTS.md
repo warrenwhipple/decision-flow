@@ -13,6 +13,10 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 Warren is actively building and iterating on `decision-mode`.
 But it is too early and confusing to run it on itself.
 Warren is using [`HITL.md`](HITL.md) (a human owned status file) to drive development.
+When Warren asks you to "check HITL" or "review HITL", only audit it for claims
+that are now false or based on false assumptions. Do not treat its `Next`
+section as an instruction to start coding unless Warren separately asks for that
+work.
 The `decision-mode` SKILL.md is symlinked into both Codex and Claude Code global user skills for dogfooding in OTHER repos.
 You may read the `decision-mode` SKILL.md, but do NOT invoke it directly here.
 Do NOT create a `DECISION.md` file here.
