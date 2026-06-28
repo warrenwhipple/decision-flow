@@ -15,12 +15,22 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
 
 - Build a `decision-flow` skill prototype of the Decision Flow vision
 	- Keep it as simple as possible while still getting the "flow" feeling in Decision Flow
-	- Why: Decision Flow is my best self-directed project idea in the AI coding space. I need to know if I can make it feel more compelling than other AI agent orchestrators.
+	- Why: Decision Flow is my best self-directed project idea in the AI coding space. I need a prototype for my portfolio. And an idea generator for my thinking and blogging.
+- Capture the `decision-flow` feelings
+  - Reduce manager feeling - I should not feel like I am juggling agents or conversation threads or worktrees or tasks or PRs
+  - Increase decider feeling - I stay focused on strategy, architecture, product feel, decision making; I offload managing to the one conversation agent
+  - Reduce attention framentation feeling
+  - Increase flow state feeling - always allow brain dumping; usually present numbered menu options as faux GUI
+  - Why: Even if decision flow is quantitatively better on some axis, uptake will require users to emotionally experience something different than other tools.
+
+## Sub goals
+
 
 ## Boundaries / Accepted Tradeoffs
 
 - No visual UI or sidecar yet. Let the agent just write the focused projection of what the user needs to see, as if they were viewing a dynamic UI.
 - Focus on Codex Mac app first. Don't worry about Codex CLI or Claude Code.
+- Numbered menu options are stand ins for GUI buttons/interactions.
 
 ## Done
 
@@ -32,16 +42,20 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
 - More explicit hints about "Triaging" and "Focusing" modes.
 - More explicit menu option actions like "Focus", "Rehearse", "Decide", etc.
 - "Try it" card delivered by rehersal agent.
+- Rehersal review mode.
 
 ## Status at a Glance
 
+- Just filed two new experiences.
+- Did a lot of thinking on adjacent "cognitive reloading" `thinking` repo topic
 - Changes since last dogfooding:
-  - Rehersal review mode.
+  - None.
 - Current frustrations:
   - Codex Mac app worktree threads require clicking around UI, feels like manager mode.
 
 ## Next
 
-- Dogfood rehearsal review mode in lightsight.
-- Stop requiring human thread juggling manager mode for rehersals and other tasks attached to worktrees.
-- Consider short note in rehearsal review if it is behind the current decision frontier.
+- Start a conversation about any next feature from last 2 experiences
+- Return to last 2 experiences, review for yet to address follow ups˝
+- Consider short note in rehearsal review if it is behind the current decision frontier; allows more parrallel agents at once
+- Extract some kind of useful insight from thinking topic cognitive-reloading
