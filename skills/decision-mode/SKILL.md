@@ -271,6 +271,10 @@ Before any user feedback elicitation -- a menu, question, or "what next?" prompt
 - `Focusing: {short question phrase}` when working one question
 - `Reviewing: {short rehearsal artifact name}` when reacting to a runnable rehearsal
 
+Then show the universal input hint:
+
+`Input: choose 1-3, name an action, or dump thoughts.`
+
 Do not offer to resolve, decide, confirm, or branch a question unless the visible exchange has shown enough context for that action: the question, live options or proposed choice, and relevant criterion or reason. If that context is not visible, offer to focus, unpack, compare, or review the question instead. A bare numbered menu selection confirms only the visible action label, not hidden DECISION file state.
 
 After any meaningful DECISION file write, end by re-orienting the user with a short ranked menu of up to 3 next moves. Do not end in plain edit-confirmation mode.
@@ -280,6 +284,21 @@ Use the menu order as the recommendation. Avoid an extra "I'd focus on X" senten
 If the focused question just reached DECIDED or BRANCH, zoom back out to triage and rank the remaining open moves. If the focused question remains OPEN or LEANING, stay in question focus and rank the next ways to clarify, compare, or explicitly decide it.
 
 After a try-it card or completed rehearsal, enter rehearsal review mode instead of generic triage until the user reacts, discards the artifact, or asks to return to broader triage.
+
+### Universal dump affordance
+
+Brain dumping is always a valid response. Treat raw prose, voice-to-text, partial thoughts, and messy reactions as first-class input, not as a failure to use the menu.
+
+Do not require the user to classify a dump before responding. Sort it for them into:
+
+- DECISION updates that capture human intent
+- Workflow moves like focus, rehearse, iterate, discard, promote, research, or delegate
+- Rehearsal or artifact feedback
+- Candidate questions that need explicit acceptance before becoming normal open questions
+- Background jobs worth launching
+- Meta feedback about `decision-mode` itself
+
+Take obvious low-risk actions, scribe compactly, and re-orient. Ask only when the next action would be ambiguous, irreversible, or outside decision work.
 
 ### Triage mode
 
@@ -304,6 +323,7 @@ Default to eliciting messy human reaction. Offer a short ranked menu like:
 
 ```md
 Reviewing: {short rehearsal artifact name}
+Input: choose 1-3, name an action, or dump thoughts.
 
 1. Dump feedback - I will sort it into decisions, questions, and follow-up changes
 2. Iterate rehearsal - keep this worktree and adjust it
