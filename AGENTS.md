@@ -6,6 +6,7 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 
 - `skills/decision-mode/` - dead-simple prototype agent skill for decision-centered work
 - `docs/experience/` - repo-local timestamped dogfood field notes and auto-ethnographic observations
+- `docs/experience/insights.md` - rolling, agent-editable synthesis of dogfood insights, feature threads, open questions, and handled learnings
 - `docs/reports/` - timestamped research and capability reports that synthesize findings from experiments
 
 ## Building `decision-mode` skill
@@ -17,6 +18,10 @@ When Warren asks you to "check HITL" or "review HITL", only audit it for claims
 that are now false or based on false assumptions. Do not treat its `Next`
 section as an instruction to start coding unless Warren separately asks for that
 work.
+Use [`docs/experience/insights.md`](docs/experience/insights.md) for rolling
+dogfood synthesis and feature/open-question tracking. Keep `HITL.md` for
+Warren's current mental model and mind-codebase drift checks, not general
+status bookkeeping.
 The `decision-mode` SKILL.md is symlinked into both Codex and Claude Code global user skills for dogfooding in OTHER repos.
 You may read the `decision-mode` SKILL.md, but do NOT invoke it directly here.
 Do NOT create a `DECISION.md` file here.
