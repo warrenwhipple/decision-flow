@@ -28,9 +28,9 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
 
 ## Boundaries / Accepted Tradeoffs
 
-- No visual UI or sidecar yet. Let the agent just write the focused projection of what the user needs to see, as if they were viewing a dynamic UI.
-- Focus on Codex Mac app first. Don't worry about Codex CLI or Claude Code.
-- Numbered menu options are stand ins for GUI buttons/interactions.
+- No visual UI or visual sidecar yet - Let the agent just write the focused projection of what the user needs to see, as if they were viewing a dynamic UI.
+- Focus on Codex Mac app first - Don't worry about Codex CLI or Claude Code.
+- Psuedo UI - Numbered menu options are stand-ins for GUI buttons/interactions.
 
 ## Done
 
@@ -43,20 +43,20 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
 - More explicit menu option actions like "Focus", "Rehearse", "Decide", etc.
 - "Try it" card delivered by rehersal agent.
 - Rehersal review mode.
+
+## Done not yet dogfooded and experienced
+
 - Universal dump affordance.
+- Rehersal lifecycle vocabulary.
 
 ## Status at a Glance
 
-- Just filed two new experiences.
+- Working through last 2 dogfooding experiences.
 - Did a lot of thinking on adjacent "cognitive reloading" `thinking` repo topic
-- Changes since last dogfooding:
-  - Universal dump affordance.
-- Current frustrations:
-  - Codex Mac app worktree threads require clicking around UI, feels like manager mode.
 
 ## Next
 
-- Rehersal lifecycle vocabulary.
-- Return to last 2 experiences, review for yet-to-address follow-ups.
-- Consider short note in rehearsal review if it is behind the current decision frontier; allows more parrallel agents at once
+- Return to last 2 experiences, review for yet-to-address follow-ups / features.
+- Consider short warning note in rehearsal review if it is behind the current decision frontier; allows more parrallel agents at once.
 - Extract some kind of useful insight from thinking topic cognitive-reloading
+- Lift decision-mode skill insights into decision-flow vision

@@ -19,13 +19,13 @@ Lazily create a new DECISION file only if you cannot find one related to the use
 
 ## DECISION file compatibility
 
-Current DECISION file schema: `0.2`.
+Current DECISION file schema: `0.3`.
 
 For newly created or intentionally migrated DECISION files, add a compact marker near the top:
 
-`<!-- decision-mode: schema=0.2; reviewed=YYYY-MM-DD -->`
+`<!-- decision-mode: schema=0.3; reviewed=YYYY-MM-DD -->`
 
-Version the DECISION file schema only for changes that affect file semantics or migration, such as new decision fields, status meanings, job status meanings, or whether workflow moves are represented as jobs instead of decisions. Do not treat normal conversation guidance, delegation guidance, or writing-style refinements as schema changes.
+Version the DECISION file schema only for changes that affect file semantics or migration, such as new decision fields, status meanings, job status meanings, named rehearsal lifecycle records, or whether workflow moves are represented as jobs instead of decisions. Do not treat normal conversation guidance, delegation guidance, or writing-style refinements as schema changes.
 
 When reading an existing DECISION file, check for the marker. If it is absent, infer the schema from the structure. Migrate only when a concrete mismatch would affect the current work. Do not churn old DECISION files solely to refresh formatting or add the marker.
 
@@ -45,17 +45,19 @@ DECISION file ontology is grounded in QOC, IBIS, wicked problem analysis and iss
 
 **Jobs** - Tasks that can be delegated to AI agents to run in the background while the main `decision-mode` conversation proceeds. Jobs may attach to a question, option, or criterion. Jobs may include codebase exploration, web/docs research, dependency code research, spike experiments, and rehearsal handoffs. Jobs have a status of TODO, BUSY, READY, REVIEWED. Order by most recent status edit to top.
 
+**Rehearsals** - Named throwaway implementation artifacts that test how recorded decisions feel in code. Rehearsals are supporting objects, not top-level decisions. Give each rehearsal a stable id like R1 or R2. A rehearsal records lifecycle status, covered frontier slice, worktree/thread/branch when known, try-it command or URL, synthesis note, and outcome. Lifecycle status is BUILDING, READY, REVIEWING, ITERATING, DISCARDED, PROMOTED, or SUPERSEDED. Order by most recent status edit to top.
+
 **Decision** - Current answer to a question. A decision records status, encoding, selected option or branch set, confidence, and rationale.
 
 Decision status is OPEN, LEANING, DECIDED, or BRANCH. Confidence is TENTATIVE or SURE.
 
-Decision encoding is orthogonal to status. Status is epistemic; encoding tracks whether the decision has materialized in code: NOT_ENCODED (default), REHEARSED (materialized in a throwaway rehearsal artifact), ENCODED (landed in real implementation). Mark ENCODED only when the decision is observed in the real codebase or confirmed by the user, never from a rehearsal artifact. Omit the encoding line for decisions that don't manifest in code.
+Decision encoding is orthogonal to status. Status is epistemic; encoding tracks whether the decision has materialized in code: NOT_ENCODED (default), REHEARSED (materialized in at least one throwaway rehearsal artifact), ENCODED (landed in real implementation). When known, include the rehearsal id in the encoding note, such as `REHEARSED (R2)`. A promoted rehearsal is still not landed implementation. Mark ENCODED only when the decision is observed in the real codebase or confirmed by the user, never from a rehearsal artifact. Omit the encoding line for decisions that don't manifest in code.
 
 The **frontier** is the set of decisions with Status DECIDED and Encoding NOT_ENCODED — decided but not yet expressed in code. When selecting work for a rehearsal, prioritize decided > leaning > open, and slice to the minimal relevant set.
 
 If a TODO, BUSY, or READY job informs a question, that question can be LEANING at most, never DECIDED. A spike or research job is evidence toward a decision, not the decision itself.
 
-Workflow moves like spike, rehearsal, delegate, research, or build are actions, not questions or decisions. Never create a decision for "should we spike/rehearse/build/delegate?" If the user asks for one of these moves, either do it or log the resulting Job; record only the job, evidence, and synthesis that come back.
+Workflow moves like spike, rehearsal, iterate, discard, promote, delegate, research, or build are actions, not questions or decisions. Never create a decision for "should we spike/rehearse/build/delegate?" If the user asks for one of these moves, either do it or log the resulting Job, Rehearsal, evidence, and synthesis that come back.
 
 ## DECISION file template
 
@@ -64,12 +66,16 @@ Workflow moves like spike, rehearsal, delegate, research, or build are actions, 
 
 {Goal context and framing. 1 or 2 phrases.}
 
-<!-- decision-mode: schema=0.2; reviewed=YYYY-MM-DD -->
+<!-- decision-mode: schema=0.3; reviewed=YYYY-MM-DD -->
 
 {Optional issue tracker ref id or link}
 
 **Criteria**
 - {Optional HIGH|LOW|IGNORE} - {phrase}
+- ...
+
+**Rehearsals**
+- R1 - {BUILDING|READY|REVIEWING|ITERATING|DISCARDED|PROMOTED|SUPERSEDED} - {artifact}; covers: {question/decision refs}; try: {URL or command}; note: {path}
 - ...
 
 ## {Question title}
@@ -89,11 +95,11 @@ Workflow moves like spike, rehearsal, delegate, research, or build are actions, 
   - ...
 
 **Jobs**
-- TODO/BUSY/READY/REVIEWED - Research/Spike/Rehearsal - {Job description}
+- TODO/BUSY/READY/REVIEWED - Research/Spike/Rehearsal - {Job description; rehearsal: R1 when applicable}
 
 **Decision**
 - Status - {OPEN|LEANING|DECIDED|BRANCH}
-- Encoding - {NOT_ENCODED|REHEARSED|ENCODED}
+- Encoding - {NOT_ENCODED|REHEARSED|ENCODED} {optional rehearsal id, e.g. R2}
 - Choice - {current option phrase, decided option phrase, or unresolved}
   - {branch option phrase} - {git branch}
   - ...
@@ -175,7 +181,7 @@ When Codex background tools are available, choose the backend by job type:
 - `create_thread` in a worktree - Default for rehearsal implementation. Start a fresh Codex thread from a compact brief that points to the DECISION file and the exact frontier slice to rehearse. This gives the rehearsal an isolated checkout without copying the whole conversation.
 - `fork_thread` in a worktree - Use only when the rehearsal genuinely needs transcript context that has not yet been captured in the DECISION file. Forking copies completed conversation history; it should not substitute for a good DECISION-file handoff.
 
-For worktree threads, do not assume the parent thread will receive a completion notification. Record the pending worktree id, eventual thread id, worktree path, branch if known, and, when known, launch command or URL and rehearsal synthesis note path in the Job line. Inspect later with thread tools such as `list_threads` and `read_thread`, then mark the job READY only after reading the result.
+For worktree threads, do not assume the parent thread will receive a completion notification. Record the pending worktree id, eventual thread id, worktree path, branch if known, and, when known, launch command or URL and rehearsal synthesis note path in the Job line and matching Rehearsal entry. Inspect later with thread tools such as `list_threads` and `read_thread`, then mark the job READY and rehearsal READY only after reading the result.
 
 ### Research offloader
 
@@ -220,11 +226,23 @@ Treat implementation as a background job only when it is a spike or rehearsal ha
 
 **Spike** - Minimal throwaway code answering one OPEN or LEANING question. Log as a Spike Job, gather evidence, then synthesize findings back into the relevant question, criteria, options, or Decision. A spike produces evidence toward a decision, not the decision itself.
 
-**Rehearsal** - Snapshot the DECISION file, select a slice of the frontier (DECIDED ∧ NOT_ENCODED, minimal relevant set), then autonomously build that slice in a separate worktree/rehearsal branch and run it in the background when possible. Output is a felt, runnable artifact plus a tiny rehearsal synthesis note, not a decision. The human-facing result is a try-it card, not a report. Log as a Rehearsal Job.
+**Rehearsal** - Snapshot the DECISION file, allocate a rehearsal id, select a slice of the frontier (DECIDED ∧ NOT_ENCODED, minimal relevant set), then autonomously build that slice in a separate worktree/rehearsal branch and run it in the background when possible. Output is a felt, runnable artifact plus a tiny rehearsal synthesis note, not a decision. The human-facing result is a try-it card, not a report. Log as a Rehearsal Job and Rehearsal entry.
 
 Choose a rehearsal synthesis note path before launch, usually `/private/tmp/decision-flow-jobs/{YYYY-MM-DD-HHMM}-rehearsal-{short-slug}.md`. Keep synthesis notes outside the repo by default; they are temporary working memory for the main decision-mode agent, not project documentation or a user-facing surface.
 
 Assumption guardrail: when a rehearsal needs an answer to an OPEN or LEANING question, resolve it to a temporary best-guess assumption without asking the user. Log each assumption in the rehearsal synthesis note and leave the question's status unchanged — "assumed SQLite for the rehearsal; question remains OPEN." A rehearsal never flips a decision status; only synthesis with the user does.
+
+Rehearsal lifecycle:
+
+- BUILDING - worktree/thread exists and is still making the artifact
+- READY - artifact or failure result has been inspected by the main agent and can be presented
+- REVIEWING - user has received or tried the artifact and is reacting to it
+- ITERATING - same rehearsal worktree is being adjusted from review feedback
+- DISCARDED - artifact is not an implementation path; keep only accepted learning
+- PROMOTED - artifact becomes the reference or basis for real implementation
+- SUPERSEDED - a later rehearsal replaces this artifact for the same frontier slice
+
+Promote is not land. Promoting a rehearsal chooses it as an implementation path or reference. Landing means the relevant decisions are encoded in the real codebase. Only landing can move affected decisions to Encoding ENCODED.
 
 A rehearsal completion should optimize for immediate human trial. If the artifact can run, return a very short try-it card:
 
@@ -239,25 +257,26 @@ After you try it:
 1. Dump feedback
 2. Iterate rehearsal
 3. Discard rehearsal
+4. Promote rehearsal
 ```
 
 If the artifact cannot run, say that plainly and give the shortest useful failure note plus the synthesis note path.
 
 The rehearsal synthesis note is for the main decision-mode agent, not the user's first review surface. Keep it compact, usually 10-20 lines, covering:
 
-- Which decisions materialized — mark these REHEARSED on synthesis
+- Which decisions materialized — mark these REHEARSED with the rehearsal id on synthesis
 - Which assumptions were made for open/leaning questions
 - What contradicted the recorded design
 - Candidate new questions that appeared
 - What felt good or bad in the running artifact
-- What is salvageable
+- What is salvageable or promotable
 - Launch command or URL, changed files, and likely breakage
 
-Do not add rehearsal-discovered questions directly to the main DECISION file before human review. Keep them as candidate questions in the rehearsal synthesis note, or surface them under `Possible new questions`. Promote them only when the user accepts them or gives feedback that clearly implies them.
+Do not add rehearsal-discovered questions directly to the main DECISION file before human review. Keep them as candidate questions in the rehearsal synthesis note, or surface them under `Possible new questions`. Add them only when the user accepts them or gives feedback that clearly implies them.
 
-Synthesize the rehearsal synthesis note back into the DECISION file after human review or when the user asks: update encodings, log assumptions and accepted or implied new questions, and surface contradictions to the user — a contradiction may reopen a DECIDED question, but only the user reopens it.
+Synthesize the rehearsal synthesis note back into the DECISION file after human review or when the user asks: update encodings, update rehearsal lifecycle, log assumptions and accepted or implied new questions, and surface contradictions to the user — a contradiction may reopen a DECIDED question, but only the user reopens it.
 
-Do not launch full feature implementation from Decision Mode unless the user explicitly asks to leave decision work. Keep rehearsal handoffs separate, exploratory, and synthesized back into decisions.
+Do not launch full feature implementation from Decision Mode unless the user explicitly asks to leave decision work. Keep rehearsal handoffs separate, exploratory, and synthesized back into decisions. If the user promotes a rehearsal, create or launch an implementation handoff against the real code path instead of silently treating the rehearsal worktree as landed.
 
 ## When discussing incremental next steps
 
@@ -273,17 +292,17 @@ Before any user feedback elicitation -- a menu, question, or "what next?" prompt
 
 Then show the universal input hint:
 
-`Input: choose 1-3, name an action, or dump thoughts.`
+`Input: choose a number, name an action, or dump thoughts.`
 
 Do not offer to resolve, decide, confirm, or branch a question unless the visible exchange has shown enough context for that action: the question, live options or proposed choice, and relevant criterion or reason. If that context is not visible, offer to focus, unpack, compare, or review the question instead. A bare numbered menu selection confirms only the visible action label, not hidden DECISION file state.
 
-After any meaningful DECISION file write, end by re-orienting the user with a short ranked menu of up to 3 next moves. Do not end in plain edit-confirmation mode.
+After any meaningful DECISION file write, end by re-orienting the user with a short ranked menu of up to 3 next moves. Rehearsal review may show 4 moves so discard and promote can both stay explicit. Do not end in plain edit-confirmation mode.
 
 Use the menu order as the recommendation. Avoid an extra "I'd focus on X" sentence unless the user asks for rationale.
 
 If the focused question just reached DECIDED or BRANCH, zoom back out to triage and rank the remaining open moves. If the focused question remains OPEN or LEANING, stay in question focus and rank the next ways to clarify, compare, or explicitly decide it.
 
-After a try-it card or completed rehearsal, enter rehearsal review mode instead of generic triage until the user reacts, discards the artifact, or asks to return to broader triage.
+After a try-it card or completed rehearsal, enter rehearsal review mode instead of generic triage until the user reacts, discards the artifact, promotes it, or asks to return to broader triage.
 
 ### Universal dump affordance
 
@@ -313,7 +332,7 @@ Help the user choose the next high-leverage decision. Offer a short ranked menu 
 
 Bias toward focus. In triage menus, label question-selecting options as `Focus: ...`. Do not let triage become open-ended brainstorming.
 
-If an unreviewed rehearsal is available, prefer `Review: {artifact}` over generic triage moves.
+If an unreviewed rehearsal is READY or REVIEWING, prefer `Review: {artifact}` over generic triage moves.
 
 ### Rehearsal review mode
 
@@ -323,18 +342,22 @@ Default to eliciting messy human reaction. Offer a short ranked menu like:
 
 ```md
 Reviewing: {short rehearsal artifact name}
-Input: choose 1-3, name an action, or dump thoughts.
+Input: choose a number, name an action, or dump thoughts.
 
 1. Dump feedback - I will sort it into decisions, questions, and follow-up changes
 2. Iterate rehearsal - keep this worktree and adjust it
 3. Discard rehearsal - keep only what we learned
+4. Promote rehearsal - make it the reference for real implementation
 ```
+
+Treat user phrases like "land it", "make it real", "keep this", or "use this one" during review as probable Promote rehearsal intent. Clarify only when it is unclear whether the user means promote as a reference or leave decision work to implement immediately.
 
 Treat code inspection as secondary. Offer `Inspect code details` only when the user asks or when code details are necessary to interpret feedback.
 
 While reviewing, sort feedback into:
 
 - Rehearsal changes to try in the same worktree
+- Rehearsal lifecycle outcome: iterate, discard, promote, or supersede
 - DECISION updates that capture human intent
 - Candidate questions that need explicit acceptance before becoming normal open questions
 - Contradictions or assumptions to surface back to the user
