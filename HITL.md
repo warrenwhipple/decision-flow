@@ -22,6 +22,12 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
   - Reduce attention framentation feeling
   - Increase flow state feeling - always allow brain dumping; usually present numbered menu options as faux GUI
   - Why: Even if decision flow is quantitatively better on some axis, uptake will require users to emotionally experience something different than other tools.
+- Provide emotional permission to focus
+  - Provide background, agent controlled orchestration with tangible control and feedback without distraction
+  - Why: Tokenmaxxing and maximum productivity anxieties seductively pull toward manager mode.
+- Deliberate cognitive loading
+  - Stretch the user to engage with decisions and to generate some analysis themselves
+  - Why: Flow state requires some difficulty, engagement requires some creation
 
 ## Accepted tradeoffs
 
@@ -50,15 +56,12 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
 ## Status at a Glance
 
 - Rehearsals working ish and are focus of ongoing iteration.
-- There are new rehearsal features to dogfood.
+- Important insights from dogfooding:
+  - Agent is often doing orchestration work, waiting breaks flow
+  - User can be pulled into rehearsal threads for approvals, juggling breaks flow
+  - Rehearsal control surface design and tradeoffs are load bearing and the vision is light on guidance
+  - Internal theoretical/implementation vocabulary is leaking into the conversation and control surface
 
 ## Next
 
-- Continue working through insights to land or dismiss.
-- Dogfood again soon.
-- Lift decision-mode skill insights into decision-flow vision
-
-## Open questions
-
-- Parallel approval - While job agents work in parallel threads, they may need approvals, causing manager feeling and attention frag
-- Conversation vs orchestration - Maybe these are two agent jobs, and conversation is slowed while user waits for single main agent to respond
+- Try minimal backgrounding of orchestration from conversation
