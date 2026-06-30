@@ -54,15 +54,24 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
 - Various tweaks to rehearsal lifecycle and visibility.
 - Background orchestration to workers.
 
-## Status at a Glance
+## Recent changes ready to dogfood
+
+- None
+
+## Status at a glance
 
 - Rehearsals working ish and are focus of ongoing iteration.
-- Important insights from dogfooding:
-  - Agent is often doing orchestration work, waiting breaks flow
-  - User can be pulled into rehearsal threads for approvals, juggling breaks flow
-  - Rehearsal control surface design and tradeoffs are load bearing and the vision is light on guidance
-  - Internal theoretical/implementation vocabulary is leaking into the conversation and control surface
+- Tried background orchestration, didn't seem to help the feel.
+- Considering an architecture rethink, rather than iteration.
 
-## Next
+## Important insights from dogfooding
 
-- Dogfood with Claude Code
+- Agent is often doing orchestration work, waiting breaks flow
+- User can be pulled into rehearsal threads for approvals, juggling breaks flow
+- Rehearsal control surface design and tradeoffs are load bearing and the vision is light on guidance
+- Internal theoretical/implementation vocabulary is leaking into the conversation and control surface
+
+## Todo
+
+- Absorb last experience dump into HITL important insights
+- Decide on architecture rethink vs keep itterating
