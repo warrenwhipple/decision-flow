@@ -65,3 +65,4 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
 ## Next
 
 - Try minimal backgrounding of orchestration from conversation
+- Dogfood with Claude Code

@@ -23,7 +23,7 @@ Use [`docs/experience/insights.md`](docs/experience/insights.md) for rolling
 dogfood synthesis and feature/open-question tracking. Keep `HITL.md` for
 Warren's current mental model and mind-codebase drift checks, not general
 status bookkeeping.
-The `decision-mode` SKILL.md is symlinked into both Codex and Claude Code global user skills for dogfooding in OTHER repos.
+The `decision-mode` SKILL.md is symlinked into Codex global user skills for dogfooding in OTHER repos.
 You may read the `decision-mode` SKILL.md, but do NOT invoke it directly here.
 Do NOT create a `DECISION.md` file here.
 

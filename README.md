@@ -6,26 +6,31 @@ The core bet: for ambiguous product and engineering work, the useful top-level o
 
 ## Current Prototype
 
-This repo currently contains `decision-mode`, a small Codex skill prototype for decision-centered work.
+This repo currently contains `decision-mode`, a small Codex skill for decision-centered work.
 
 Start here:
 
-- `skills/decision-mode/SKILL.md` - the prototype agent behavior
-- `docs/vision.md` - product vision and rationale
-- `docs/experience/` - timestamped dogfood notes and observations
-- `docs/experience/insights.md` - tracking and synthesis of dogfood notes
+- [`skills/decision-mode/SKILL.md`](skills/decision-mode/SKILL.md) - the prototype agent behavior
+- [`docs/vision.md`](docs/vision.md) - product vision and rationale
+- [`docs/experience/`](docs/experience/) - timestamped dogfood notes and observations
+- [`docs/experience/insights.md`](docs/experience/insights.md) - tracking and synthesis of dogfood notes
+- [`docs/reports/`](docs/reports/) - timestamped research and capability reports
 
 ## Decision Mode
 
-Decision Mode helps decompose a complex goal into:
+Decision Mode (the `decision-mode` skill) helps decompose a complex goal into:
 
 - questions
 - options
 - criteria
 - background jobs
-- current decisions
+- decisions
 
-It records progress in a `DECISION.md` file so an ambiguous session remains inspectable and resumable.
+It records progress in a `DECISION.md` file — created per working session in whatever repo you run it in, not checked in here — so an ambiguous session remains inspectable and resumable.
+
+## Try it
+
+`decision-mode` is a single skill folder, dogfooded with Codex. To use it, symlink `skills/decision-mode` into your Codex global user skills directory, then invoke `decision-mode` on a real, ambiguous task in *another* repo. It is still too early to run on itself, so don't point it at this repo expecting it to work well.
 
 ## Status
 
