@@ -52,6 +52,7 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
 - Explicit actions foregrounded to user, focus, rehearse, decide, etc.
 - Parallel thread rehearsals working, ongoing tweaks to lifecycle.
 - Various tweaks to rehearsal lifecycle and visibility.
+- Background orchestration to workers.
 
 ## Status at a Glance
 
@@ -64,5 +65,4 @@ DO NOT suggest adding missing information – this file is intentionally non-exh
 
 ## Next
 
-- Try minimal backgrounding of orchestration from conversation
 - Dogfood with Claude Code

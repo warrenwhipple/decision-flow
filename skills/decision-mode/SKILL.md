@@ -173,15 +173,41 @@ The main `decision-mode` agent's first responsibility is keeping Warren in the l
 
 If a background result is on the critical path, say that explicitly and use the shortest bounded wait that makes sense. Otherwise, record the job as BUSY, return to the decision conversation, and synthesize the result when it appears or when Warren asks to inspect it.
 
+Treat orchestration itself as backgroundable. If launching, inspecting, routing feedback to, or reconciling a rehearsal is likely to take more than about 20-30 seconds, prefer a short-lived orchestration worker over doing the whole transaction inline. The main conversation should quickly acknowledge the user's intent, start or request the orchestration transaction, and return to a useful menu or focused question.
+
+Use short-lived orchestration workers for bounded admin transactions, not a permanent orchestration thread by default. Good orchestration-worker tasks include:
+
+- Launch a rehearsal worktree/thread after the main agent has selected the visible slice
+- Inspect whether a rehearsal thread is ready and extract the try command, URL, status, and synthesis note path
+- Route concrete review feedback to an existing rehearsal thread
+- Check whether a rehearsal iteration has produced a new runnable artifact
+- Report approval-needed, blocked, failed, or ready status back to the main conversation
+
+### DECISION write ownership
+
+The main conversation owns semantic synthesis in the DECISION file: decisions, criteria, accepted questions, accepted learning, contradictions, promotion/discard rationale, and encoding changes after real implementation.
+
+Orchestration workers may make narrow mechanical DECISION file updates when that avoids blocking the live conversation:
+
+- Existing Job and Rehearsal lifecycle statuses such as BUSY, BUILDING, ITERATING, READY, REVIEWING, REVIEWED, or SUPERSEDED
+- Pending worktree id, eventual thread id, worktree path, branch, try command or URL, and synthesis note path
+- A compact note that specific user feedback was routed to a rehearsal thread
+- Mechanical timestamps or status ordering needed to keep the latest active job visible
+
+Orchestration workers must not decide questions, add normal open questions, promote/discard rehearsals, mark Encoding ENCODED, or synthesize rehearsal learning into accepted project direction. If the user has already chosen promote or discard, the main conversation should record the semantic outcome or give an orchestration worker an exact mechanical edit. If an orchestration worker discovers candidate questions, contradictions, approval needs, or ambiguous intent, it should return a concise status to the main conversation rather than changing semantic state.
+
+Status surfaced from orchestration should be compact and user-facing, for example `R1: iterating on layout`, `R1: ready to try`, `R1: blocked on approval`, or `R1: failed smoke check`. Blocked and failed are conversational statuses unless the DECISION schema explicitly represents them. Do not narrate thread ids, tool calls, or note paths unless they help Warren act.
+
 ### Codex delegation backends
 
 When Codex background tools are available, choose the backend by job type:
 
 - `spawn_agent` - Use for research, codebase exploration, dependency lookup, small checks, and other bounded non-worktree jobs. Expect completion to return through a sub-agent notification. Do not immediately call `wait_agent`; doing so blocks the main conversation. Close the agent after completion when no more interaction is needed.
+- `spawn_agent` orchestration worker - Use for bounded orchestration around worktree threads when the admin transaction would otherwise block the main conversation. Give it exact authority, including which mechanical DECISION fields it may update and which semantic changes it must return for main-thread synthesis.
 - `create_thread` in a worktree - Default for rehearsal implementation. Start a fresh Codex thread from a compact brief that points to the DECISION file and the exact frontier slice to rehearse. This gives the rehearsal an isolated checkout without copying the whole conversation.
 - `fork_thread` in a worktree - Use only when the rehearsal genuinely needs transcript context that has not yet been captured in the DECISION file. Forking copies completed conversation history; it should not substitute for a good DECISION-file handoff.
 
-For worktree threads, do not assume the parent thread will receive a completion notification. Record the pending worktree id, eventual thread id, worktree path, branch if known, and, when known, launch command or URL and rehearsal synthesis note path in the Job line and matching Rehearsal entry. Inspect later with thread tools such as `list_threads` and `read_thread`, then mark the job READY and rehearsal READY only after reading the result.
+For worktree threads, do not assume the parent thread will receive a completion notification. Record the pending worktree id, eventual thread id, worktree path, branch if known, and, when known, launch command or URL and rehearsal synthesis note path in the Job line and matching Rehearsal entry. Inspect later with thread tools such as `list_threads` and `read_thread`, preferably through an orchestration worker when inspection would block the live conversation. Mark the job READY and rehearsal READY only after reading the result.
 
 ### Research offloader
 
@@ -227,6 +253,8 @@ Treat implementation as a background job only when it is a spike or rehearsal ha
 **Spike** - Minimal throwaway code answering one OPEN or LEANING question. Log as a Spike Job, gather evidence, then synthesize findings back into the relevant question, criteria, options, or Decision. A spike produces evidence toward a decision, not the decision itself.
 
 **Rehearsal** - Snapshot the DECISION file, allocate a rehearsal id, select a slice of the frontier (DECIDED ∧ NOT_ENCODED, minimal relevant set), then autonomously build that slice in a separate worktree/rehearsal branch and run it in the background when possible. Output is a felt, runnable artifact plus a tiny rehearsal synthesis note, not a decision. The human-facing result is a try-it card, not a report. Log as a Rehearsal Job and Rehearsal entry.
+
+For rehearsal launch, the main conversation should own the user-visible slice choice and any quick approval/adjust exchange. The mechanical launch transaction can be handed to a short-lived orchestration worker: create/update the R record and BUSY job, create the worktree thread, record pending/thread/worktree identifiers, then return status. The main conversation should not make Warren wait through worktree setup when another useful decision conversation is available.
 
 Choose a rehearsal synthesis note path before launch, usually `/private/tmp/decision-flow-jobs/{YYYY-MM-DD-HHMM}-rehearsal-{short-slug}.md`. Keep synthesis notes outside the repo by default; they are temporary working memory for the main decision-mode agent, not project documentation or a user-facing surface.
 
@@ -277,6 +305,8 @@ Do not add rehearsal-discovered questions directly to the main DECISION file bef
 Synthesize the rehearsal synthesis note back into the DECISION file after human review or when the user asks: update encodings, update rehearsal lifecycle, log assumptions and accepted or implied new questions, and surface contradictions to the user — a contradiction may reopen a DECIDED question, but only the user reopens it.
 
 Do not launch full feature implementation from Decision Mode unless the user explicitly asks to leave decision work. Keep rehearsal handoffs separate, exploratory, and synthesized back into decisions. If the user promotes a rehearsal, create or launch an implementation handoff against the real code path instead of silently treating the rehearsal worktree as landed.
+
+If the user explicitly asks to land or implement a promoted rehearsal and the work is likely to take more than about 20-30 seconds, keep the live conversation separate from the implementation transaction when possible. Use a background implementation handoff or orchestration worker to do the file movement, verification, server probing, and mechanical status reporting. The main conversation should synthesize the result afterward and mark Encoding ENCODED only after the real codebase has been inspected or confirmed.
 
 ## When discussing incremental next steps
 
@@ -361,6 +391,22 @@ While reviewing, sort feedback into:
 - DECISION updates that capture human intent
 - Candidate questions that need explicit acceptance before becoming normal open questions
 - Contradictions or assumptions to surface back to the user
+
+When review feedback clearly means "iterate this artifact", keep the main conversation snappy. If routing the feedback requires finding thread ids, reading side notes, editing lifecycle lines, or sending a detailed prompt to the rehearsal thread, hand that admin transaction to an orchestration worker and immediately return a review menu such as:
+
+```md
+R1: routing layout feedback.
+
+Reviewing: {short rehearsal artifact name}
+Input: choose a number, name an action, or dump thoughts.
+
+1. Add more feedback
+2. Check whether R1 is ready
+3. Step back to broader decisions
+4. Promote or discard after checking the next version
+```
+
+When the user asks to inspect/check a rehearsal and the result is not already known, prefer an orchestration worker to read the thread and synthesis note. The worker may mark the mechanical READY state and return a try-it card draft. The main conversation should present the try-it card when it has the result, but should not block the user on thread lookup and note reading if the user can keep deciding.
 
 Leave rehearsal review mode when the user discards the artifact, asks to iterate it, promotes it toward real implementation, or explicitly returns to triage.
 
