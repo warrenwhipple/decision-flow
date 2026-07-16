@@ -14,13 +14,12 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 
 Warren is actively building and iterating on `decision-mode`.
 But it is too early and confusing to run it on itself.
-Warren is using [`HITL.md`](HITL.md) (a human owned status file) to drive development.
-When Warren asks you to "check HITL" or "review HITL", only audit it for claims
+Warren is using [`MIRROR.md`](MIRROR.md) (a human owned status file) to drive development.
 that are now false or based on false assumptions. Do not treat its `Next`
 section as an instruction to start coding unless Warren separately asks for that
 work.
 Use [`docs/experience/insights.md`](docs/experience/insights.md) for rolling
-dogfood synthesis and feature/open-question tracking. Keep `HITL.md` for
+dogfood synthesis and feature/open-question tracking. Leave `MIRROR.md` for
 Warren's current mental model and mind-codebase drift checks, not general
 status bookkeeping.
 The `decision-mode` SKILL.md is symlinked into Codex global user skills for dogfooding in OTHER repos.
