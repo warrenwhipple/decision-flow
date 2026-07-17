@@ -27,7 +27,7 @@ Invoke it with `$my-workflow` or select it through `/skills`. Prefer those struc
 
 ## Repository implications
 
-- `decision-mode` and `to-decisions` currently follow this manual-only pattern with both forms of harness metadata.
+- `decision-mode`, `deliberate`, and `to-decisions` currently follow this manual-only pattern with both forms of harness metadata.
 - Continue treating `skills/<name>/SKILL.md` as the canonical workflow.
 - `disable-model-invocation` is harmless extension metadata outside the core Agent Skills fields.
 - Permit `agents/openai.yaml` as a Codex-specific exception to the otherwise core-only skill layout.

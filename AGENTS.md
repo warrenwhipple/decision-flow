@@ -10,6 +10,7 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 - `docs/vision.md` - Decision Flow product vision and rationale
 - `docs/manual-only-skills.md` - cross-harness metadata and invocation guidance for manual-only skills
 - `skills/decision-mode/SKILL.md` - prototype agent skill for decision-centered work
+- `skills/deliberate/SKILL.md` - manual-only conversational skill for examining a problem one decision at a time
 - `skills/to-decisions/SKILL.md` - prototype skill for capturing decisions already present in a conversation
 - `scripts/link-skills.sh` - links repo-local skills into user-level harness skill directories
 - `docs/experience/` - repo-local timestamped dogfood field notes and auto-ethnographic observations
@@ -57,5 +58,5 @@ Lazy read as needed
 - Keep the shared workflow in `SKILL.md`; use optional `scripts/`, `references/`, and `assets/` for supporting material.
 - Keep `SKILL.md` below 500 lines when practical and move longer detail into `references/`.
 - Run `scripts/link-skills.sh` to link every repo-local skill into `~/.agents/skills/` for Codex and Cursor and into `~/.claude/skills/` for Claude Code. Symlinked edits are live; rerun the script only after adding, renaming, or moving a skill.
-- See [`docs/manual-only-skills.md`](docs/manual-only-skills.md) before making a skill explicit-invocation-only. Claude Code and Cursor use skill frontmatter, while Codex uses `agents/openai.yaml`.
+- See [`docs/manual-only-skills.md`](docs/manual-only-skills.md) before making a skill explicit-invocation-only. `decision-mode`, `deliberate`, and `to-decisions` are currently manual-only. Claude Code and Cursor use skill frontmatter, while Codex uses `agents/openai.yaml`.
 - Do not build an OpenCode command adapter for manual-only skills for now; OpenCode is outside the current central workflow.

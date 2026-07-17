@@ -1,0 +1,7 @@
+interface:
+  display_name: "Deliberate"
+  short_description: "Interview decisions one question at a time"
+  default_prompt: "Use $deliberate to interview me about this problem one decision at a time."
+
+policy:
+  allow_implicit_invocation: false
