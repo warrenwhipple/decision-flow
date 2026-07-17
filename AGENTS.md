@@ -4,24 +4,24 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 
 ## Repo structure
 
-- `skills/decision-mode/SKILL.md` - prototype agent skill for decision-centered work
+- `MIRROR.md` - human-owned mental mirror for overall project direction across prototypes
+- `docs/MIRROR-decision-mode.md` - human-owned mental mirror scoped to the backburnered `decision-mode` prototype
+- `docs/design-space.md` - human-owned, manually maintained structured map of the Decision Flow design space
 - `docs/vision.md` - Decision Flow product vision and rationale
+- `skills/decision-mode/SKILL.md` - prototype agent skill for decision-centered work
 - `docs/experience/` - repo-local timestamped dogfood field notes and auto-ethnographic observations
 - `docs/experience/insights.md` - rolling, agent-editable synthesis of dogfood insights, feature threads, open questions, and handled learnings
 - `docs/reports/` - timestamped research and capability reports that synthesize findings from experiments
 
-## Building `decision-mode` skill
+## `decision-mode` skill
 
-Warren is actively building and iterating on `decision-mode`.
-But it is too early and confusing to run it on itself.
-Warren is using [`MIRROR.md`](MIRROR.md) (a human owned status file) to drive development.
-that are now false or based on false assumptions. Do not treat its `Next`
-section as an instruction to start coding unless Warren separately asks for that
-work.
+Work on `decision-mode` is backburnered while Warren tries simpler prototypes.
+Do not assume it is the current implementation focus. It is still too early and
+confusing to run `decision-mode` on itself.
+
 Use [`docs/experience/insights.md`](docs/experience/insights.md) for rolling
-dogfood synthesis and feature/open-question tracking. Leave `MIRROR.md` for
-Warren's current mental model and mind-codebase drift checks, not general
-status bookkeeping.
+dogfood synthesis and feature/open-question tracking, not either human-owned
+mirror.
 The `decision-mode` SKILL.md is symlinked into Codex global user skills for dogfooding in OTHER repos.
 You may read the `decision-mode` SKILL.md, but do NOT invoke it directly here.
 Do NOT create a `DECISION.md` file here.
