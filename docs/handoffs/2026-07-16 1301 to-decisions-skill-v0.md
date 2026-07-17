@@ -33,15 +33,26 @@ Core guardrail — do not manufacture closure: distinguish what the user explici
 Warren runs skills on very smart frontier models. Agents drafting skills love to write in edge cases, defensive instructions, and elaborated process steps that smart models don't need — that is exactly how `decision-mode` grew to 432 lines. Do not do this.
 
 - v0 must cover the contract above and nothing else. Target the size class of `to-spec` (~60 lines, most of it template), not `decision-mode`.
-- Before writing skill text, test the bare baseline prompt ("capture the decisions in this conversation") — the SKILL.md is only the delta the baseline demonstrably needs. A line that doesn't change behavior is a no-op; leave it out.
+- Build the smallest plausible prototype from the settled contract before assembling a corpus. v0 is an intuition-built probe for seeing whether the artifact and invocation feel useful, not yet an experimentally demonstrated improvement over a bare prompt.
 - No edge-case handling, no failure-mode hedging, no "if the user does X" branches in v0. Guardrails get added later, one at a time, each earned by a reproducible observed failure and annotated with why it exists (so it can be pruned when models improve).
 - When in doubt, leave it out. An under-specified v0 that fails informatively is the point of the experiment.
 
 ## Development process
 
-- Assemble a small corpus of real transcripts (clean explicit-choice conversation; messy voice dump with implicit leanings; conversation with reversals; mixed user/agent proposals).
+### Phase 1: greenfield prototype and wild dogfood
+
+- Write the minimal v0 from the contract above without waiting for an eval corpus.
+- Try it on real greenfield decision work in at least two natural sessions: one ordinary "just talk to it" conversation and one structured Grill Me conversation. These may happen in different repos or in separate dogfood sessions. Do not shape either conversation to make `to-decisions` look good.
+- At a natural stopping point, invoke `to-decisions`, inspect whether the artifact feels faithful, compact, and useful, then give only that artifact to a fresh context and see whether it can understand the state of deliberation and continue coherently.
+- Preserve the original transcript, generated artifact, and brief human reaction where practical. These paired examples become the first corpus; corpus collection should emerge from real use rather than block the prototype.
+- Do not immediately add an instruction for every awkward output. Gather multiple examples first unless a failure prevents the prototype from functioning.
+
+### Phase 2: corpus evaluation and failure-driven refinement
+
+- After several wild uses, freeze a small corpus of real transcripts. Expand beyond the first two friendly cases to include a messy voice dump with implicit leanings, a conversation with reversals, and mixed user/agent proposals.
+- Run both the bare baseline prompt ("capture the decisions in this conversation") and the current skill against the corpus. Treat the SKILL.md as a candidate delta over baseline from this point forward; retain only instructions that demonstrably help.
 - Eval properties, not exact wording: invented decisions = zero; important decisions not missed; correct DECIDED/LEANING/OPEN classification; rejected alternatives preserved with reasons; contradictions visible; scannable; and the headline test — a fresh agent can resume deliberation from the artifact without the transcript.
-- Deletion testing on every later addition: periodically remove each guardrail and confirm behavior actually worsens.
+- Add guardrails only for reproducible observed failures. Periodically delete each later addition and confirm behavior actually worsens without it.
 
 ## References
 
