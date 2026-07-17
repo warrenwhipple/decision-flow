@@ -4,14 +4,16 @@ Decision Flow is an early-stage exploration of AI-assisted software work organiz
 
 The core bet: for ambiguous product and engineering work, the useful top-level object is often an ordered list of open questions. Agents can help research, spike, and clarify those questions while the human stays focused on the next meaningful decision.
 
-## Current Prototype
+## Current Prototypes
 
-This repo currently contains `decision-mode`, a small Codex skill for decision-centered work.
+This repo contains small, closely related prototype skills for decision-centered work.
 
 Start here:
 
 - [`skills/decision-mode/SKILL.md`](skills/decision-mode/SKILL.md) - the prototype agent behavior
+- [`skills/to-decisions/SKILL.md`](skills/to-decisions/SKILL.md) - capture decision state from an existing conversation
 - [`docs/vision.md`](docs/vision.md) - product vision and rationale
+- [`docs/manual-only-skills.md`](docs/manual-only-skills.md) - manual-only invocation across Codex, Claude Code, and Cursor
 - [`docs/experience/`](docs/experience/) - timestamped dogfood notes and observations
 - [`docs/experience/insights.md`](docs/experience/insights.md) - tracking and synthesis of dogfood notes
 - [`docs/reports/`](docs/reports/) - timestamped research and capability reports
@@ -30,7 +32,9 @@ It records progress in a `DECISION.md` file — created per working session in w
 
 ## Try it
 
-`decision-mode` is a single skill folder, dogfooded with Codex. To use it, symlink `skills/decision-mode` into your Codex global user skills directory, then invoke `decision-mode` on a real, ambiguous task in *another* repo. It is still too early to run on itself, so don't point it at this repo expecting it to work well.
+Run `scripts/link-skills.sh` to link the repo's skills into the user-level skill directories used by Codex, Cursor, and Claude Code. The links point back to this checkout, so skill edits are immediately available for dogfooding without copying files. Existing real directories at the same skill names are moved to timestamped backups; unrelated installed skills remain in place. Harnesses may need a new session to reload changed instructions.
+
+Invoke `decision-mode` explicitly with `$decision-mode` in Codex or `/decision-mode` in Claude Code and Cursor. Both prototype skills are user-invoked-only; see [`docs/manual-only-skills.md`](docs/manual-only-skills.md) for the harness metadata. OpenCode manual-only adapters are intentionally deferred.
 
 ## Status
 

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Decision Mode"
+  short_description: "Guide decision-centered work"
+  default_prompt: "Use $decision-mode to guide this work through questions, options, criteria, and decisions."
+
+policy:
+  allow_implicit_invocation: false

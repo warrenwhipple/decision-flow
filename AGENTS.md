@@ -8,7 +8,10 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 - `docs/MIRROR-decision-mode.md` - human-owned mental mirror scoped to the backburnered `decision-mode` prototype
 - `docs/design-space.md` - human-owned, manually maintained structured map of the Decision Flow design space
 - `docs/vision.md` - Decision Flow product vision and rationale
+- `docs/manual-only-skills.md` - cross-harness metadata and invocation guidance for manual-only skills
 - `skills/decision-mode/SKILL.md` - prototype agent skill for decision-centered work
+- `skills/to-decisions/SKILL.md` - prototype skill for capturing decisions already present in a conversation
+- `scripts/link-skills.sh` - links repo-local skills into user-level harness skill directories
 - `docs/experience/` - repo-local timestamped dogfood field notes and auto-ethnographic observations
 - `docs/experience/insights.md` - rolling, agent-editable synthesis of dogfood insights, feature threads, open questions, and handled learnings
 - `docs/reports/` - timestamped research and capability reports that synthesize findings from experiments
@@ -16,15 +19,11 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 ## `decision-mode` skill
 
 Work on `decision-mode` is backburnered while Warren tries simpler prototypes.
-Do not assume it is the current implementation focus. It is still too early and
-confusing to run `decision-mode` on itself.
+Do not assume it is the current implementation focus.
 
 Use [`docs/experience/insights.md`](docs/experience/insights.md) for rolling
 dogfood synthesis and feature/open-question tracking, not either human-owned
 mirror.
-The `decision-mode` SKILL.md is symlinked into Codex global user skills for dogfooding in OTHER repos.
-You may read the `decision-mode` SKILL.md, but do NOT invoke it directly here.
-Do NOT create a `DECISION.md` file here.
 
 ## Dogfood repos
 
@@ -52,6 +51,11 @@ Lazy read as needed
 - `../../notes/thinking/topics/decision-flow/intellectual-history-decision.md` - decision-oriented intellectual history
 - `../../notes/thinking/topics/decision-flow/intellectual-history-flow-state.md` - flow-state intellectual history
 
-## Local live edit
+## Skill conventions and local live edit
 
-- `~/.agents/skills/decision-mode` symlinks to `skills/decision-mode`
+- Keep canonical skills directly under `skills/<name>/` with matching kebab-case frontmatter names.
+- Keep the shared workflow in `SKILL.md`; use optional `scripts/`, `references/`, and `assets/` for supporting material.
+- Keep `SKILL.md` below 500 lines when practical and move longer detail into `references/`.
+- Run `scripts/link-skills.sh` to link every repo-local skill into `~/.agents/skills/` for Codex and Cursor and into `~/.claude/skills/` for Claude Code. Symlinked edits are live; rerun the script only after adding, renaming, or moving a skill.
+- See [`docs/manual-only-skills.md`](docs/manual-only-skills.md) before making a skill explicit-invocation-only. Claude Code and Cursor use skill frontmatter, while Codex uses `agents/openai.yaml`.
+- Do not build an OpenCode command adapter for manual-only skills for now; OpenCode is outside the current central workflow.

@@ -1,6 +1,7 @@
 ---
 name: decision-mode
 description: Use when the user asks for decision mode or points to a DECISION.md or DECISION-{slug}.md file
+disable-model-invocation: true
 ---
 
 # Decision Mode

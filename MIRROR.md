@@ -23,4 +23,4 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
 
 ## Future direction
 
-- Try simple `to-decisions` skill per handoff
+- Dogfood `to-decisions` on a personalized news aggregator `feed`

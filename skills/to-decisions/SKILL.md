@@ -1,6 +1,7 @@
 ---
 name: to-decisions
 description: Turn the current conversation into a compact structured decision document—no interview, only synthesis of what was already discussed.
+disable-model-invocation: true
 ---
 
 # To Decisions
