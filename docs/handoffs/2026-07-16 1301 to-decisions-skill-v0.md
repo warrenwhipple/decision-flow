@@ -4,12 +4,12 @@
 
 ## What this is
 
-First extracted primitive from the `decision-mode` decomposition (see `topics/decision-flow/thinking-on-decomposing-architecture.md` in the thinking repo). A transcript-to-decision-handoff compiler, modeled on the contract of Matt Pocock's `to-spec`: no interview, pure synthesis of what already happened. It is deliberately NOT a miniature Decision Flow — it tests whether decision state can be captured faithfully, not whether decision-centered flow works.
+First extracted primitive from the `decision-mode` decomposition (see `docs/design-space`). A transcript-to-decision-handoff compiler, modeled on the contract of Matt Pocock's `to-spec`: no interview, pure synthesis of what already happened. It is deliberately NOT a miniature Decision Flow — it tests whether decision state can be captured faithfully, not whether decision-centered flow works.
 
 ## Contract (settled with Warren)
 
 - Name: `to-decisions`. Lives at `skills/to-decisions/SKILL.md` in this repo.
-- User-invoked only: `disable-model-invocation: true`.
+- User-invoked only to preserve context window: e.g. `disable-model-invocation: true`.
 - Input: the live conversation by default. Other sources (docs, transcripts from other harnesses, web) only when the user explicitly points at them.
 - Do NOT: interview the user, explore the repo, research the subject, produce a spec, suggest next steps, or implement anything.
 - Output: one timestamped markdown file per capture. Follow the repo's existing convention for such notes if one exists; otherwise `docs/decisions/{YYYY-MM-DD HHMM} {slug}.md`.
