@@ -1,0 +1,7 @@
+interface:
+  display_name: "To Decisions"
+  short_description: "Capture decisions from the current conversation"
+  default_prompt: "Use $to-decisions to capture the decisions in this conversation."
+
+policy:
+  allow_implicit_invocation: false
