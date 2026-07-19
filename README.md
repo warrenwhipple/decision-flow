@@ -43,4 +43,4 @@ Invoke the skills explicitly with `$decision-mode`, `$deliberate`, or `$to-decis
 
 ## Status
 
-Private iteration. The repo is intentionally small while the behavior is being dogfooded before any broader release.
+Early public iteration. The repo is intentionally small while the skills are being dogfooded; expect rough edges and fast changes.
