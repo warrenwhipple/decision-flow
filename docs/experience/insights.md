@@ -1,9 +1,10 @@
-# Decision Mode Dogfood Insights
+# Decision Flow Dogfood Insights
 
 Rolling synthesis of dogfood experience notes. Keep bullets compact. Put source links beside each insight so one insight can point to many notes and one note can feed many insights.
 
 ## Current Product Feeling
 
+- Decisions visible while deliberating - the strongest pull from using `deliberate` plus `to-decisions` was toward a visual surface where Warren can watch the decision structure take shape during the grilling session, rather than receiving the structure only as a later Markdown artifact. Sources: [2026-07-20 2340](<2026-07-20 2340 deliberate-to-decisions-blog-redesign.md>)
 - Decider, not manager - Warren talks to one orchestrating conversation agent and stays focused on decisions, not thread/worktree/task juggling. Sources: [2026-06-26 0734](<2026-06-26 0734 decision-mode-lightsight-rehearsal-orchestration.md>), [2026-06-29 0753](<2026-06-29 0753 decision-mode-lightsight-rehearsal-promotion-flow.md>), conversation 2026-06-28
 - Flow through dump plus menu - freeform brain dumps and numbered pseudo-UI actions should both feel native. Sources: [2026-06-26 0734](<2026-06-26 0734 decision-mode-lightsight-rehearsal-orchestration.md>), [2026-06-29 0753](<2026-06-29 0753 decision-mode-lightsight-rehearsal-promotion-flow.md>), conversation 2026-06-28
 - Big wait not beaten yet - even with smaller gut-review loops, tryable artifacts can lag far enough behind live decisions that the flow still feels like plan/wait/review. Sources: [2026-06-30 1728](<2026-06-30 1728 decision-mode-lightsight-rehearsal-lag.md>)
@@ -12,6 +13,7 @@ Rolling synthesis of dogfood experience notes. Keep bullets compact. Put source 
 
 ## Active Feature Threads
 
+- Decision artifact format - the current `to-decisions` shape splits decisions from their alternatives and criteria, and capture may rewrite decisions in ways Warren does not expect; explore formats that preserve the relationships and the user's intended decision statements. Sources: [2026-07-20 2340](<2026-07-20 2340 deliberate-to-decisions-blog-redesign.md>)
 - Rehearsal availability - surface rehearsal when unrehearsed/unimplemented frontier decisions exist. Sources: [2026-06-25 1623](<2026-06-25 1623 decision-mode-lightsight-rehearsal-prioritization.md>), [2026-06-29 0753](<2026-06-29 0753 decision-mode-lightsight-rehearsal-promotion-flow.md>), conversation 2026-06-28
 - Rehearsal scope and launch approval - before a worker starts, show the slice it will test with quick yes/adjust; all-frontier or inferred auto-launch can be too broad. Sources: [2026-06-29 0753](<2026-06-29 0753 decision-mode-lightsight-rehearsal-promotion-flow.md>), [2026-06-30 1728](<2026-06-30 1728 decision-mode-lightsight-rehearsal-lag.md>)
 - Rehearsal information gain - push rehearsals upward when abstract uncertainty is hard and a throwaway artifact would teach quickly. Sources: [2026-06-08 1004](<2026-06-08 1004 decision-mode-lightsight.md>), [2026-06-25 1623](<2026-06-25 1623 decision-mode-lightsight-rehearsal-prioritization.md>)
@@ -30,6 +32,7 @@ Rolling synthesis of dogfood experience notes. Keep bullets compact. Put source 
 
 ## Open Questions
 
+- Conversational skills versus visual workspace - should a live decision view augment the `deliberate` conversation, replace the post-hoc Markdown capture flow, or become a separate prototype? Sources: [2026-07-20 2340](<2026-07-20 2340 deliberate-to-decisions-blog-redesign.md>)
 - Approval interruptions - background agents can hit approvals and pull Warren back into manager mode. Sources: [2026-06-26 0734](<2026-06-26 0734 decision-mode-lightsight-rehearsal-orchestration.md>)
 - Conversation versus orchestration split - after short-lived worker offload, when is a durable orchestration thread or custom app needed? Sources: [2026-06-26 0734](<2026-06-26 0734 decision-mode-lightsight-rehearsal-orchestration.md>), [2026-06-29 0753](<2026-06-29 0753 decision-mode-lightsight-rehearsal-promotion-flow.md>), conversation 2026-06-30
 - Codex thread/worktree UI ceiling - can Codex infrastructure be bent far enough before a custom app is needed? Sources: [2026-06-08 1315](<2026-06-08 1315 grill-me-timeline-tool.md>), [2026-06-25 1253](<2026-06-25 1253 decision-mode-lightsight-rehearsal-thread-ui.md>)
