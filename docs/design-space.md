@@ -7,7 +7,6 @@ AI agents should not edit this file unless explicitly asked.
 
 ## Abbreviation Key
 
-SD(s) = structured decision(s)
 `+` = pro / supports
 `-` = con / detracts from
 
@@ -42,12 +41,15 @@ Criteria cut across questions and options.
     - `spec` - Capture decisions as a structured list of requirements.
     - `q-and-a` - A decision is a question and it's answer.
     - `multiple-choice` - A decision is a question framing a selection among options.
-    - `qoc` - Questions have multiple options, and multiple criteria cut across options.
-    - `complex` - Problems, goals, sub-goals, alternatives, claims, criteria, sub-criteria, pros/cons, supports/detracts relations, etc...
-- `graph` - How to structure decision-decision relationships?
-    - `list` - Decisions are a flat list, with options as properties.
+    - `pro-con` - Questions have options; options have pro and con arguments.
+    - `qoc` - Questions have options; criteria cut across options.
+    - `complex` - Problems, goals, sub-goals, alternatives, claims, criteria, sub-criteria, arguments, supports/detracts relations, etc...
+- `topology` - How do decisions relate to other decisions?
+	- `set` - Decision order is irrelevant.
+    - `list` - Decision order is indifferent to upstream decisions.
     - `tree` - A decision is downstream of one other decision, or a root problem/goal.
     - `dag` - A decision may be relevant to multiple upstream decision branches.
+    - `dense-coupling` - every decision potentially influences the relevance of every other decision.
 - `architecture` - Where do structured decisions belong in human-AI system architecture?
     - `llm-reasoning` - LLMs use scratchpad structured decisions similar to chain-of-thought reasoning, context window only, collapsed from responses, human inspectable.
 		- `+ thinking-architecture`
