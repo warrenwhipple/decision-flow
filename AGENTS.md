@@ -9,6 +9,9 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 - `docs/design-space.md` - human-owned, manually maintained structured map of the Decision Flow design space
 - `docs/vision.md` - Decision Flow product vision and rationale
 - `docs/manual-only-skills.md` - cross-harness metadata and invocation guidance for manual-only skills
+- `docs/visualizer-v0-spec.md` - spec for the `dviz` decision visualizer prototype, the current focus
+- `dviz/` - the `dviz` visualizer: single Bun package with CLI, server, and React view (`src/cli/`, `src/server/`, `src/view/`); not yet created
+- `skills/dviz/SKILL.md` - agent-facing skill for driving `dviz` (planned)
 - `skills/decision-mode/SKILL.md` - prototype agent skill for decision-centered work
 - `skills/deliberate/SKILL.md` - manual-only conversational skill for examining a problem one decision at a time
 - `skills/to-decisions/SKILL.md` - prototype skill for capturing decisions already present in a conversation

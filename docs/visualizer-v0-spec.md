@@ -31,7 +31,18 @@ A thin **CLI** wraps the HTTP API. Agents edit exclusively through the CLI, guid
 
 Multi-agent concurrency = queueing at the single writer. Invariants (e.g. DAG acyclicity) are checked inside the write transaction and rejected with readable errors the agent can act on.
 
-The CLI and server take an explicit DB file path. Default location (project repo vs central dir) deliberately deferred.
+### DB file location
+
+- **Repo-local, one space per project.** Default DB is `.dviz/space.db`, resolved by walking up from cwd (like `.git`). No space found → readable error pointing at `dviz init`.
+- **Gitignored for v0.** `dviz init` creates `.dviz/` and adds it to `.gitignore` (directory, not just the file — SQLite WAL/SHM sidecars live there too). Committing a markdown projection alongside is a possible later win, not v0.
+- **Override** via `--db <path>` or `DVIZ_DB` env var, which also covers the rare cross-project space. The default is a UX choice, cheap to revisit after dogfooding.
+- One Bun process per decision space; concurrently served repos are distinguished by port.
+
+### Code location
+
+- All visualizer code lives in `dviz/` at the repo root: a single Bun package (`src/cli/`, `src/server/`, `src/view/`) sharing one `package.json` and lockfile. `bun link` provides the global `dviz` binary.
+- The agent-facing skill lives in `skills/dviz/SKILL.md`, following existing skill conventions.
+- No workspace/monorepo split and no separate repo for v0; extract to its own repo only if it survives dogfooding.
 
 ## Data model
 
@@ -123,29 +134,29 @@ CREATE TABLE edits (
 
 Every write records an `edits` row with an `actor` — this is the provenance answer (human/agent/mixed per edit) and the raw material for later session replay.
 
-## CLI surface (proposed; name TBD, `df` as placeholder)
+## CLI surface (`dviz`, "decision visualizer")
 
 ```
-df init <file>                    create a decision space
-df serve <file> [--port]          start server + view
-df question add "..." [--parent ID] [--detail ...]
-df question update ID [...]
-df question lean ID --option ID
-df question decide ID --option ID
-df question reopen ID
-df option add --question ID "..."
-df criterion add <slug> [--desc ...]
-df assess --option ID --criterion SLUG --polarity +|-|~|? [--note ...]
-df relate --question ID --criterion SLUG
-df accept <kind> ID               suggested → accepted (any entity or edge)
-df remove <kind> ID
-df focus <kind> ID
-df outline [--depth N] [--around ID]    compact markdown projection for agent re-reads
-df show <kind> ID                       full detail of one node
-df log [--since ...]                    recent edits
+dviz init [--db <path>]           create a decision space (default .dviz/space.db, gitignored)
+dviz serve [--db <path>] [--port] start server + view
+dviz question add "..." [--parent ID] [--detail ...]
+dviz question update ID [...]
+dviz question lean ID --option ID
+dviz question decide ID --option ID
+dviz question reopen ID
+dviz option add --question ID "..."
+dviz criterion add <slug> [--desc ...]
+dviz assess --option ID --criterion SLUG --polarity +|-|~|? [--note ...]
+dviz relate --question ID --criterion SLUG
+dviz accept <kind> ID               suggested → accepted (any entity or edge)
+dviz remove <kind> ID
+dviz focus <kind> ID
+dviz outline [--depth N] [--around ID]    compact markdown projection for agent re-reads
+dviz show <kind> ID                       full detail of one node
+dviz log [--since ...]                    recent edits
 ```
 
-Notes: everything an agent creates defaults to `suggested`; `accept` is the human-consent verb (invoked by the agent only when the human says so in conversation). `df outline` is the markdown-as-output principle in practice — the agent re-reads state as a projection, never edits files.
+Notes: everything an agent creates defaults to `suggested`; `accept` is the human-consent verb (invoked by the agent only when the human says so in conversation). `dviz outline` is the markdown-as-output principle in practice — the agent re-reads state as a projection, never edits files.
 
 ## View
 
@@ -173,8 +184,6 @@ Rendering rules:
 
 ## Open questions (parked, not blocking)
 
-- CLI/tool name (`df`? something else?)
-- Default DB file location (project repo vs central dir)
 - Whether the outline shows options inline or only on drill-in
 - Detail-view contents (research links/citations live here?)
 - Fractional vs integer `position` maintenance
