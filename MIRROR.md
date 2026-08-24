@@ -24,20 +24,17 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
 
 - Some progress with `decision-mode`, paused, see [MIRROR-decision-mode](docs/MIRROR-decision-mode.md)
 - [design-space](docs/design-space.md) applies manual decision method to the design space itself
+- Some progress on simpler `deliberate` and `to-decisions` skills
 
 ## Recent changes ready to dogfood
 
-- `deliberate` skill
-- `to-decisions` skill
-
+- No, waiting on visualizer prototype
 
 ## Status at a glance
 
-- `decision-mode` backburnered for now
-- Actively prototyping `deliberate` and `to-decisions`
+- Parked for now: `decision-mode`, `deliberate`, and `to-decisions` skills
+- Focusing on visualizer, v0 spec is written in docs
 
-## Future direction
+## Possible future direction
 
-- Dogfood "just talk to it" style then `to-decisions` session
-- Dogfood `deliberate` then `to-decisions` session
-- After a few dogfood sessions review handoff for post preliminary experiences plan
+- If visualizer feels good, consider how `delierate` and `to-decisions` compose with it
