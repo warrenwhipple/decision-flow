@@ -31,7 +31,18 @@ A thin **CLI** wraps the HTTP API. Agents edit exclusively through the CLI, guid
 
 Multi-agent concurrency = queueing at the single writer. Invariants (e.g. DAG acyclicity) are checked inside the write transaction and rejected with readable errors the agent can act on.
 
-The CLI and server take an explicit DB file path. Default location (project repo vs central dir) deliberately deferred.
+### DB file location
+
+- **Repo-local, one space per project.** Default DB is `.dviz/space.db`, resolved by walking up from cwd (like `.git`). No space found → readable error pointing at `dviz init`.
+- **Gitignored for v0.** `dviz init` creates `.dviz/` and adds it to `.gitignore` (directory, not just the file — SQLite WAL/SHM sidecars live there too). Committing a markdown projection alongside is a possible later win, not v0.
+- **Override** via `--db <path>` or `DVIZ_DB` env var, which also covers the rare cross-project space. The default is a UX choice, cheap to revisit after dogfooding.
+- One Bun process per decision space; concurrently served repos are distinguished by port.
+
+### Code location
+
+- All visualizer code lives in `dviz/` at the repo root: a single Bun package (`src/cli/`, `src/server/`, `src/view/`) sharing one `package.json` and lockfile. `bun link` provides the global `dviz` binary.
+- The agent-facing skill lives in `skills/dviz/SKILL.md`, following existing skill conventions.
+- No workspace/monorepo split and no separate repo for v0; extract to its own repo only if it survives dogfooding.
 
 ## Data model
 
@@ -44,8 +55,8 @@ Every question, option, and criterion carries a required human-minted-or-agent-m
 - **Uniqueness per kind**: question slugs unique per space; criterion slugs unique per space (unchanged); option slugs unique **within their question** only. Cross-kind homonyms are allowed (a question and a criterion may both be `trust`) — the CLI always carries a kind, and the view styles the kinds distinctly.
 - **Collisions are rejected** at write time with a readable error. Never auto-suffix — that would silently mint a bad name into permanent shared vocabulary; the agent should retry with a better one.
 - **Renames** are ordinary updates (no acceptance knock-back) but get a distinct `rename` verb in the edits log with old→new in the payload. No aliases, no old handles: after a rename the old slug resolves to nothing; history lives in the log, not the data model.
-- **Integer IDs are internal only.** They stay as primary keys (rename stability, cheap FKs) but nothing above the SQL layer speaks them: the CLI addresses by slug, and `outline`/`show`/errors render slugs. Rationale: one canonical handle per entity is cleaner context hygiene than two, slugs bind semantically for the agent, and a hallucinated slug fails loudly (no such slug → readable rejection) where a near-miss integer ID would silently hit the wrong row. `df outline --ids` **(proposed)** as an undocumented debug flag.
-- **Option paths.** Where an option is referenced outside its question's context, qualify it as `question-slug/option-slug` (e.g. `df show option ontology/spec`).
+- **Integer IDs are internal only.** They stay as primary keys (rename stability, cheap FKs) but nothing above the SQL layer speaks them: the CLI addresses by slug, and `outline`/`show`/errors render slugs. Rationale: one canonical handle per entity is cleaner context hygiene than two, slugs bind semantically for the agent, and a hallucinated slug fails loudly (no such slug → readable rejection) where a near-miss integer ID would silently hit the wrong row. `dviz outline --ids` **(proposed)** as an undocumented debug flag.
+- **Option paths.** Where an option is referenced outside its question's context, qualify it as `question-slug/option-slug` (e.g. `dviz show option ontology/spec`).
 - Slug-minting heuristics (when to split `trust` into `user-trust`/`agent-trust`, rename-early-rename-rarely, don't use digits for mere enumeration) belong in the agent skill, not the CLI or schema.
 
 ### Status, two orthogonal dimensions
@@ -140,32 +151,32 @@ CREATE TABLE edits (
 
 Every write records an `edits` row with an `actor` — this is the provenance answer (human/agent/mixed per edit) and the raw material for later session replay.
 
-## CLI surface (proposed; name TBD, `df` as placeholder)
+## CLI surface (`dviz`, "decision visualizer")
 
 All addressing is by slug; integer IDs never appear on this surface. `QSLUG` = question slug, `OSLUG` = option slug (bare where the question is already named, `QSLUG/OSLUG` path form elsewhere), `CSLUG` = criterion slug.
 
 ```
-df init <file>                    create a decision space
-df serve <file> [--port]          start server + view
-df question add <slug> "title" [--parent QSLUG] [--detail ...]
-df question update QSLUG [--slug NEW] [...]
-df question lean QSLUG --option OSLUG
-df question decide QSLUG --option OSLUG
-df question reopen QSLUG
-df option add --question QSLUG <slug> "title" [--detail ...]
-df option update QSLUG/OSLUG [--slug NEW] [...]
-df criterion add <slug> [--desc ...]
-df assess --option QSLUG/OSLUG --criterion CSLUG --polarity +|-|~|? [--note ...]
-df relate --question QSLUG --criterion CSLUG
-df accept <kind> <slug>           suggested → accepted (any entity or edge)
-df remove <kind> <slug>
-df focus <kind> <slug>
-df outline [--depth N] [--around QSLUG] [--ids]   compact markdown projection for agent re-reads
-df show <kind> <slug>                             full detail of one node
-df log [--since ...]                              recent edits
+dviz init [--db <path>]           create a decision space (default .dviz/space.db, gitignored)
+dviz serve [--db <path>] [--port] start server + view
+dviz question add <slug> "title" [--parent QSLUG] [--detail ...]
+dviz question update QSLUG [--slug NEW] [...]
+dviz question lean QSLUG --option OSLUG
+dviz question decide QSLUG --option OSLUG
+dviz question reopen QSLUG
+dviz option add --question QSLUG <slug> "title" [--detail ...]
+dviz option update QSLUG/OSLUG [--slug NEW] [...]
+dviz criterion add <slug> [--desc ...]
+dviz assess --option QSLUG/OSLUG --criterion CSLUG --polarity +|-|~|? [--note ...]
+dviz relate --question QSLUG --criterion CSLUG
+dviz accept <kind> <slug>           suggested → accepted (any entity or edge)
+dviz remove <kind> <slug>
+dviz focus <kind> <slug>
+dviz outline [--depth N] [--around QSLUG] [--ids]   compact markdown projection for agent re-reads
+dviz show <kind> <slug>                             full detail of one node
+dviz log [--since ...]                              recent edits
 ```
 
-Notes: everything an agent creates defaults to `suggested`; `accept` is the human-consent verb (invoked by the agent only when the human says so in conversation). `df outline` is the markdown-as-output principle in practice — the agent re-reads state as a projection, never edits files. Slug collisions and format violations reject inside the write transaction with a readable error; `--slug NEW` on update logs as `rename`.
+Notes: everything an agent creates defaults to `suggested`; `accept` is the human-consent verb (invoked by the agent only when the human says so in conversation). `dviz outline` is the markdown-as-output principle in practice — the agent re-reads state as a projection, never edits files. Slug collisions and format violations reject inside the write transaction with a readable error; `--slug NEW` on update logs as `rename`.
 
 ## View
 
@@ -195,8 +206,6 @@ Rendering rules:
 ## Open questions (parked, not blocking)
 
 - Review policy for agent edits to accepted entities (incl. renames) — how to display edits so the human isn't surprised, without full diff UI. Deferred; the edits log captures old→new, so nothing is foreclosed.
-- CLI/tool name (`df`? something else?)
-- Default DB file location (project repo vs central dir)
 - Whether the outline shows options inline or only on drill-in
 - Detail-view contents (research links/citations live here?)
 - Fractional vs integer `position` maintenance
