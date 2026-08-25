@@ -1,6 +1,6 @@
 # Visualizer v0 Spec (draft)
 
-AI-compiled draft (Claude, 2026-08-24) carpentered from Warren's deliberation session. Warren owns final decisions; mark up freely. Every decision below was stated or accepted by Warren on 2026-08-24 unless marked **(proposed)**.
+AI-compiled draft (Claude, 2026-08-24) carpentered from Warren's deliberation session. Warren owns final decisions; mark up freely. Every decision below was stated or accepted by Warren on 2026-08-24 (slug/handle decisions: 2026-08-25) unless marked **(proposed)**.
 
 ## Purpose
 
@@ -35,6 +35,19 @@ The CLI and server take an explicit DB file path. Default location (project repo
 
 ## Data model
 
+### Slugs, the universal handle
+
+Every question, option, and criterion carries a required human-minted-or-agent-minted **slug** (e.g. `capture-friction`, `oauth2`). Slugs exist for two reasons: **scannability** (a left-anchored column of short recognizable tokens makes dense outline cards scannable the way design-space.md is) and **shared vocabulary** (one stable handle used identically by the human in conversation, the agent in CLI calls, and the view in chips).
+
+- **Slug + title coexist** on questions and options: the slug is the handle, the title stays a full human phrase. Criteria remain slug + description only (no title for v0).
+- **Format**, enforced inside the write transaction: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, max 64 chars. Starts with a letter so a slug can never be all-numeric (kills slug-vs-integer-ID ambiguity forever); lowercase, digits allowed (`v0`, `oauth2`), single hyphens as the only separator. Everything else stays reserved: `+ - ~ ?` for polarity, `/` for option paths.
+- **Uniqueness per kind**: question slugs unique per space; criterion slugs unique per space (unchanged); option slugs unique **within their question** only. Cross-kind homonyms are allowed (a question and a criterion may both be `trust`) — the CLI always carries a kind, and the view styles the kinds distinctly.
+- **Collisions are rejected** at write time with a readable error. Never auto-suffix — that would silently mint a bad name into permanent shared vocabulary; the agent should retry with a better one.
+- **Renames** are ordinary updates (no acceptance knock-back) but get a distinct `rename` verb in the edits log with old→new in the payload. No aliases, no old handles: after a rename the old slug resolves to nothing; history lives in the log, not the data model.
+- **Integer IDs are internal only.** They stay as primary keys (rename stability, cheap FKs) but nothing above the SQL layer speaks them: the CLI addresses by slug, and `outline`/`show`/errors render slugs. Rationale: one canonical handle per entity is cleaner context hygiene than two, slugs bind semantically for the agent, and a hallucinated slug fails loudly (no such slug → readable rejection) where a near-miss integer ID would silently hit the wrong row. `df outline --ids` **(proposed)** as an undocumented debug flag.
+- **Option paths.** Where an option is referenced outside its question's context, qualify it as `question-slug/option-slug` (e.g. `df show option ontology/spec`).
+- Slug-minting heuristics (when to split `trust` into `user-trust`/`agent-trust`, rename-early-rename-rarely, don't use digits for mere enumeration) belong in the agent skill, not the CLI or schema.
+
 ### Status, two orthogonal dimensions
 
 - **Acceptance** — `suggested | accepted` — applies to *every* entity and edge. Agent-proposed objects enter as `suggested` and render dotted until the human accepts them (the gate: suggestions must never silently become accepted).
@@ -44,8 +57,9 @@ The CLI and server take an explicit DB file path. Default location (project repo
 
 ```sql
 CREATE TABLE questions (
-  id INTEGER PRIMARY KEY,
-  title TEXT NOT NULL,            -- short card text; outline cards are dense
+  id INTEGER PRIMARY KEY,         -- internal only; never surfaced above SQL
+  slug TEXT NOT NULL UNIQUE,      -- handle; format checked in write transaction
+  title TEXT NOT NULL,            -- full human phrase; slug carries the scan
   detail TEXT DEFAULT '',         -- expandable detail view body
   acceptance TEXT NOT NULL DEFAULT 'suggested',  -- suggested | accepted
   resolution TEXT NOT NULL DEFAULT 'open',       -- open | leaning | decided
@@ -65,11 +79,13 @@ CREATE TABLE question_parents (
 CREATE TABLE options (
   id INTEGER PRIMARY KEY,
   question_id INTEGER NOT NULL REFERENCES questions(id),
+  slug TEXT NOT NULL,             -- unique within the question, not globally
   title TEXT NOT NULL,
   detail TEXT DEFAULT '',
   acceptance TEXT NOT NULL DEFAULT 'suggested',
   position REAL NOT NULL,
-  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE (question_id, slug)
 );
 
 CREATE TABLE criteria (
@@ -114,7 +130,8 @@ CREATE TABLE edits (
   id INTEGER PRIMARY KEY,
   ts TEXT NOT NULL,
   actor TEXT NOT NULL,            -- e.g. agent:<name> | human | import
-  verb TEXT NOT NULL,             -- add | update | accept | assess | decide | lean | focus | ...
+  verb TEXT NOT NULL,             -- add | update | rename | accept | assess | decide | lean | focus | ...
+                                  -- rename payload records old + new slug
   entity_kind TEXT NOT NULL,
   entity_id INTEGER,
   payload TEXT NOT NULL           -- JSON of the change
@@ -125,38 +142,42 @@ Every write records an `edits` row with an `actor` — this is the provenance an
 
 ## CLI surface (proposed; name TBD, `df` as placeholder)
 
+All addressing is by slug; integer IDs never appear on this surface. `QSLUG` = question slug, `OSLUG` = option slug (bare where the question is already named, `QSLUG/OSLUG` path form elsewhere), `CSLUG` = criterion slug.
+
 ```
 df init <file>                    create a decision space
 df serve <file> [--port]          start server + view
-df question add "..." [--parent ID] [--detail ...]
-df question update ID [...]
-df question lean ID --option ID
-df question decide ID --option ID
-df question reopen ID
-df option add --question ID "..."
+df question add <slug> "title" [--parent QSLUG] [--detail ...]
+df question update QSLUG [--slug NEW] [...]
+df question lean QSLUG --option OSLUG
+df question decide QSLUG --option OSLUG
+df question reopen QSLUG
+df option add --question QSLUG <slug> "title" [--detail ...]
+df option update QSLUG/OSLUG [--slug NEW] [...]
 df criterion add <slug> [--desc ...]
-df assess --option ID --criterion SLUG --polarity +|-|~|? [--note ...]
-df relate --question ID --criterion SLUG
-df accept <kind> ID               suggested → accepted (any entity or edge)
-df remove <kind> ID
-df focus <kind> ID
-df outline [--depth N] [--around ID]    compact markdown projection for agent re-reads
-df show <kind> ID                       full detail of one node
-df log [--since ...]                    recent edits
+df assess --option QSLUG/OSLUG --criterion CSLUG --polarity +|-|~|? [--note ...]
+df relate --question QSLUG --criterion CSLUG
+df accept <kind> <slug>           suggested → accepted (any entity or edge)
+df remove <kind> <slug>
+df focus <kind> <slug>
+df outline [--depth N] [--around QSLUG] [--ids]   compact markdown projection for agent re-reads
+df show <kind> <slug>                             full detail of one node
+df log [--since ...]                              recent edits
 ```
 
-Notes: everything an agent creates defaults to `suggested`; `accept` is the human-consent verb (invoked by the agent only when the human says so in conversation). `df outline` is the markdown-as-output principle in practice — the agent re-reads state as a projection, never edits files.
+Notes: everything an agent creates defaults to `suggested`; `accept` is the human-consent verb (invoked by the agent only when the human says so in conversation). `df outline` is the markdown-as-output principle in practice — the agent re-reads state as a projection, never edits files. Slug collisions and format violations reject inside the write transaction with a readable error; `--slug NEW` on update logs as `rename`.
 
 ## View
 
 Two views plus one deferred:
 
-1. **Overview outline** — the default. Ordered, dense, long-thin cards (title + status glyphs), recursive outline of questions; options visible inline or one drill-in down **(proposed: inline, collapsed to titles)**. Used to see live decisions and pick the next one to work.
+1. **Overview outline** — the default. Ordered, dense, long-thin cards (slug chip + title + status glyphs), recursive outline of questions; options visible inline or one drill-in down **(proposed: inline, collapsed to titles)**. Used to see live decisions and pick the next one to work.
 2. **Zoomed decision view** — one question: all options with details, assessments as slug chips with +/−/~/? polarity and notes, plus criteria attached via `question_criteria`. Shown criteria = relevance edges ∪ criteria appearing in the options' assessments.
 3. **Global criteria list** (sort/filter) — build only if time allows; not demo-critical.
 
 Rendering rules:
 
+- **Slug chips anchor every card.** Each card leads with its slug as a monospace chip, then the title, then status glyphs — a left-anchored column of short recognizable tokens is what makes the dense outline scannable (and it matches the criteria chips already in the zoomed view). Options in the overview outline collapse to slug-only **(proposed)**; titles appear in the zoomed view. Criterion chips, question slugs, and option slugs get distinct styling so cross-kind homonyms stay unambiguous.
 - **Statuses legible at a glance.** `suggested` = dotted card outline, at every appearance. `decided` / `leaning` / `open` get distinct glyphs/affordances on the card **(proposed: filled dot / half dot / empty dot + selected-option shown on decided/leaning cards)**.
 - **Transclusion.** A multi-parent question renders under each parent. Its first parent is its canonical appearance (focus jumps go there); secondary appearances render collapsed with an "also under X" marker.
 - **Follow mode.** View follows the focus pointer by default; any manual scroll/drill breaks follow; a persistent recenter button returns to the conversation's current focus and re-engages following. v0 focus is a single node id.
@@ -173,6 +194,7 @@ Rendering rules:
 
 ## Open questions (parked, not blocking)
 
+- Review policy for agent edits to accepted entities (incl. renames) — how to display edits so the human isn't surprised, without full diff UI. Deferred; the edits log captures old→new, so nothing is foreclosed.
 - CLI/tool name (`df`? something else?)
 - Default DB file location (project repo vs central dir)
 - Whether the outline shows options inline or only on drill-in
