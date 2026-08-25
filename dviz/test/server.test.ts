@@ -58,3 +58,44 @@ test("POST /api/questions persists and broadcasts an outline SSE event", async (
   expect(update).toContain('"title":"Appears live"');
   await reader.cancel();
 });
+
+test("command and projection APIs cover the v0 CLI lifecycle", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "dviz-server-test-"));
+  temporaryDirectories.push(directory);
+  const dbPath = join(directory, "space.db");
+  initializeSpace(dbPath).close();
+  const server = await startServer({ dbPath, port: await availablePort() });
+  servers.push(server);
+
+  const run = async (action: string, body: Record<string, unknown>) => {
+    const response = await fetch(`${server.url}/api/command`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, actor: "agent:test", ...body }),
+    });
+    expect(response.status).toBe(200);
+    return (await response.json() as { result: Record<string, unknown> }).result;
+  };
+
+  const question = await run("question.add", { title: "Choose a route" });
+  const option = await run("option.add", { questionId: question.id, title: "Northern route" });
+  const criterion = await run("criterion.add", { slug: "speed", description: "Arrive sooner" });
+  await run("assess", { optionId: option.id, criterionSlug: "speed", polarity: "+", note: "Direct" });
+  await run("relate", { questionId: question.id, criterionSlug: "speed" });
+  await run("question.decide", { id: question.id, optionId: option.id });
+  await run("accept", { kind: "question", reference: question.id });
+  await run("accept", { kind: "placement", reference: { firstId: question.id, second: "root" } });
+
+  const outline = await (await fetch(`${server.url}/api/outline`)).json() as Record<string, unknown[]>;
+  expect(outline).toMatchObject({
+    questions: [{ resolution: "decided", resolvedOptionId: option.id, acceptance: "accepted" }],
+    placements: [{ acceptance: "accepted" }],
+    options: [{ title: "Northern route", acceptance: "suggested" }],
+  });
+  expect(await (await fetch(`${server.url}/api/outline.md`)).text())
+    .toContain(`● Q${question.id} Choose a route → O${option.id}`);
+  expect(await (await fetch(`${server.url}/api/show/option/${option.id}`)).text())
+    .toContain("+ speed [suggested] — Direct");
+  expect(await (await fetch(`${server.url}/api/log`)).text()).toContain("decide question");
+  expect(criterion.slug).toBe("speed");
+});

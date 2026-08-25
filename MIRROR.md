@@ -33,9 +33,10 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
 ## Status at a glance
 
 - Parked for now: `decision-mode`, `deliberate`, and `to-decisions` skills
-- Focusing on visualizer
+- Focusing on visualizer, stepping through v0 spec "Build order"
   - v0 spec is written in docs
   - v0 thin slice works
+  - v0 full CLI, statuses, dotted rendering works
 
 ## Possible future direction
 

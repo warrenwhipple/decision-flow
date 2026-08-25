@@ -1,16 +1,52 @@
 import { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { OutlineSnapshot, Question } from "../db/space.ts";
+import type { Option, OutlineSnapshot, Placement, Question } from "../db/space.ts";
 
 type Connection = "connecting" | "live" | "offline";
 
-function QuestionCard({ question }: { question: Question }) {
+const resolutionGlyph = { open: "○", leaning: "◐", decided: "●" } as const;
+
+function QuestionCard({
+  question,
+  placement,
+  options,
+}: {
+  question: Question;
+  placement: Placement;
+  options: Option[];
+}) {
+  const selected = options.find(({ id }) => id === question.resolvedOptionId);
+  const suggested = question.acceptance === "suggested" || placement.acceptance === "suggested";
   return (
-    <article className={`question-card ${question.acceptance}`}>
-      <span className="resolution" aria-label={`${question.resolution} question`}>○</span>
-      <span className="question-title">{question.title}</span>
-      <span className="question-id">Q{question.id}</span>
-    </article>
+    <div className="decision-entry">
+      <article className={`question-card ${suggested ? "suggested" : "accepted"} ${question.resolution}`}>
+        <span className="resolution" aria-label={`${question.resolution} question`}>
+          {resolutionGlyph[question.resolution]}
+        </span>
+        <span className="question-copy">
+          <span className="question-title">{question.title}</span>
+          {selected && question.resolution !== "open" && (
+            <span className="selected-option">
+              {question.resolution === "decided" ? "Decided" : "Leaning"}: {selected.title}
+            </span>
+          )}
+        </span>
+        <span className="question-id">Q{question.id}</span>
+      </article>
+      {options.length > 0 && (
+        <ul className="option-list" aria-label={`Options for ${question.title}`}>
+          {options.map((option) => (
+            <li
+              className={`${option.acceptance} ${option.id === question.resolvedOptionId ? "selected" : ""}`}
+              key={option.id}
+            >
+              <span>{option.title}</span>
+              <span className="option-id">O{option.id}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -20,25 +56,35 @@ function Outline({ snapshot }: { snapshot: OutlineSnapshot }) {
     [snapshot.questions],
   );
   const childrenByParent = useMemo(() => {
-    const children = new Map<number | null, number[]>();
+    const children = new Map<number | null, Placement[]>();
     for (const placement of snapshot.placements) {
       const siblings = children.get(placement.parentId) ?? [];
-      siblings.push(placement.childId);
+      siblings.push(placement);
       children.set(placement.parentId, siblings);
     }
     return children;
   }, [snapshot.placements]);
+  const optionsByQuestion = useMemo(() => {
+    const options = new Map<number, Option[]>();
+    for (const option of snapshot.options) {
+      const siblings = options.get(option.questionId) ?? [];
+      siblings.push(option);
+      options.set(option.questionId, siblings);
+    }
+    return options;
+  }, [snapshot.options]);
 
   const renderBranch = (parentId: number | null, ancestors = new Set<number>()) => {
-    const childIds = childrenByParent.get(parentId) ?? [];
-    return childIds.map((childId) => {
+    const placements = childrenByParent.get(parentId) ?? [];
+    return placements.map((placement) => {
+      const childId = placement.childId;
       const question = questionsById.get(childId);
       if (!question || ancestors.has(childId)) return null;
       const nextAncestors = new Set(ancestors).add(childId);
       const children = renderBranch(childId, nextAncestors);
       return (
         <li key={`${parentId ?? "root"}-${childId}`}>
-          <QuestionCard question={question} />
+          <QuestionCard question={question} placement={placement} options={optionsByQuestion.get(childId) ?? []} />
           {children.length > 0 && <ol>{children}</ol>}
         </li>
       );
@@ -58,7 +104,7 @@ function Outline({ snapshot }: { snapshot: OutlineSnapshot }) {
 }
 
 function App() {
-  const [snapshot, setSnapshot] = useState<OutlineSnapshot>({ questions: [], placements: [] });
+  const [snapshot, setSnapshot] = useState<OutlineSnapshot>({ questions: [], placements: [], options: [] });
   const [connection, setConnection] = useState<Connection>("connecting");
 
   useEffect(() => {
@@ -87,7 +133,7 @@ function App() {
       <section aria-live="polite">
         <Outline snapshot={snapshot} />
       </section>
-      <footer>Suggested questions use a dotted outline.</footer>
+      <footer>○ open · ◐ leaning · ● decided · dotted outlines are suggested</footer>
     </main>
   );
 }

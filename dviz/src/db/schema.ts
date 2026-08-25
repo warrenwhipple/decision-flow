@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS questions (
@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS question_parents (
   child_id INTEGER NOT NULL REFERENCES questions(id),
   parent_id INTEGER REFERENCES questions(id),
   position REAL NOT NULL,
+  acceptance TEXT NOT NULL DEFAULT 'suggested'
+    CHECK (acceptance IN ('suggested', 'accepted')),
   UNIQUE (child_id, parent_id)
 );
 
