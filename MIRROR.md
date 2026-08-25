@@ -33,7 +33,9 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
 ## Status at a glance
 
 - Parked for now: `decision-mode`, `deliberate`, and `to-decisions` skills
-- Focusing on visualizer, v0 spec is written in docs
+- Focusing on visualizer
+  - v0 spec is written in docs
+  - v0 thin slice works
 
 ## Possible future direction
 
