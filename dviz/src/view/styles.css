@@ -83,7 +83,7 @@ ol {
 
 .question-card {
   display: grid;
-  grid-template-columns: 24px 1fr auto;
+  grid-template-columns: minmax(7rem, auto) 1fr 24px;
   align-items: center;
   min-height: 50px;
   padding: 9px 13px;
@@ -101,6 +101,30 @@ ol {
 .resolution {
   color: #5e6857;
   font-size: 1.05rem;
+  text-align: right;
+}
+
+.slug-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.question-slug {
+  margin-right: 12px;
+  padding: 5px 7px;
+  color: #3f5745;
+  background: #dce6d8;
+}
+
+.option-slug {
+  padding: 4px 6px;
+  color: #66563f;
+  background: #ece1cf;
 }
 
 .question-title {
@@ -113,13 +137,6 @@ ol {
   margin-top: 3px;
   color: #68705f;
   font-size: 0.74rem;
-}
-
-.question-id {
-  margin-left: 14px;
-  color: #8a8e85;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
 }
 
 .option-list {
@@ -152,12 +169,6 @@ ol {
 .option-list li.selected {
   color: #344431;
   background: rgba(218, 228, 210, 0.72);
-}
-
-.option-id {
-  color: #92968e;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.64rem;
 }
 
 .empty-state {

@@ -15,33 +15,32 @@ function QuestionCard({
   placement: Placement;
   options: Option[];
 }) {
-  const selected = options.find(({ id }) => id === question.resolvedOptionId);
+  const selected = options.find(({ slug }) => slug === question.resolvedOptionSlug);
   const suggested = question.acceptance === "suggested" || placement.acceptance === "suggested";
   return (
     <div className="decision-entry">
       <article className={`question-card ${suggested ? "suggested" : "accepted"} ${question.resolution}`}>
-        <span className="resolution" aria-label={`${question.resolution} question`}>
-          {resolutionGlyph[question.resolution]}
-        </span>
+        <span className="slug-chip question-slug">{question.slug}</span>
         <span className="question-copy">
           <span className="question-title">{question.title}</span>
           {selected && question.resolution !== "open" && (
             <span className="selected-option">
-              {question.resolution === "decided" ? "Decided" : "Leaning"}: {selected.title}
+              {question.resolution === "decided" ? "Decided" : "Leaning"}: {selected.slug}
             </span>
           )}
         </span>
-        <span className="question-id">Q{question.id}</span>
+        <span className="resolution" aria-label={`${question.resolution} question`}>
+          {resolutionGlyph[question.resolution]}
+        </span>
       </article>
       {options.length > 0 && (
         <ul className="option-list" aria-label={`Options for ${question.title}`}>
           {options.map((option) => (
             <li
-              className={`${option.acceptance} ${option.id === question.resolvedOptionId ? "selected" : ""}`}
-              key={option.id}
+              className={`${option.acceptance} ${option.slug === question.resolvedOptionSlug ? "selected" : ""}`}
+              key={option.slug}
             >
-              <span>{option.title}</span>
-              <span className="option-id">O{option.id}</span>
+              <span className="slug-chip option-slug">{option.slug}</span>
             </li>
           ))}
         </ul>
@@ -51,40 +50,40 @@ function QuestionCard({
 }
 
 function Outline({ snapshot }: { snapshot: OutlineSnapshot }) {
-  const questionsById = useMemo(
-    () => new Map(snapshot.questions.map((question) => [question.id, question])),
+  const questionsBySlug = useMemo(
+    () => new Map(snapshot.questions.map((question) => [question.slug, question])),
     [snapshot.questions],
   );
   const childrenByParent = useMemo(() => {
-    const children = new Map<number | null, Placement[]>();
+    const children = new Map<string | null, Placement[]>();
     for (const placement of snapshot.placements) {
-      const siblings = children.get(placement.parentId) ?? [];
+      const siblings = children.get(placement.parentSlug) ?? [];
       siblings.push(placement);
-      children.set(placement.parentId, siblings);
+      children.set(placement.parentSlug, siblings);
     }
     return children;
   }, [snapshot.placements]);
   const optionsByQuestion = useMemo(() => {
-    const options = new Map<number, Option[]>();
+    const options = new Map<string, Option[]>();
     for (const option of snapshot.options) {
-      const siblings = options.get(option.questionId) ?? [];
+      const siblings = options.get(option.questionSlug) ?? [];
       siblings.push(option);
-      options.set(option.questionId, siblings);
+      options.set(option.questionSlug, siblings);
     }
     return options;
   }, [snapshot.options]);
 
-  const renderBranch = (parentId: number | null, ancestors = new Set<number>()) => {
-    const placements = childrenByParent.get(parentId) ?? [];
+  const renderBranch = (parentSlug: string | null, ancestors = new Set<string>()) => {
+    const placements = childrenByParent.get(parentSlug) ?? [];
     return placements.map((placement) => {
-      const childId = placement.childId;
-      const question = questionsById.get(childId);
-      if (!question || ancestors.has(childId)) return null;
-      const nextAncestors = new Set(ancestors).add(childId);
-      const children = renderBranch(childId, nextAncestors);
+      const childSlug = placement.childSlug;
+      const question = questionsBySlug.get(childSlug);
+      if (!question || ancestors.has(childSlug)) return null;
+      const nextAncestors = new Set(ancestors).add(childSlug);
+      const children = renderBranch(childSlug, nextAncestors);
       return (
-        <li key={`${parentId ?? "root"}-${childId}`}>
-          <QuestionCard question={question} placement={placement} options={optionsByQuestion.get(childId) ?? []} />
+        <li key={`${parentSlug ?? "root"}-${childSlug}`}>
+          <QuestionCard question={question} placement={placement} options={optionsByQuestion.get(childSlug) ?? []} />
           {children.length > 0 && <ol>{children}</ol>}
         </li>
       );
@@ -96,7 +95,7 @@ function Outline({ snapshot }: { snapshot: OutlineSnapshot }) {
     return (
       <div className="empty-state">
         <p>No questions yet.</p>
-        <code>dviz question add "What should we decide?"</code>
+        <code>dviz question add next-step "What should we decide?"</code>
       </div>
     );
   }

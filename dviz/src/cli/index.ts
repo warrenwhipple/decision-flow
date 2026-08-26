@@ -10,7 +10,6 @@ import {
   initializeSpace,
   resolvePath,
   serverInfoPath,
-  type EdgeReference,
   type EntityKind,
   type NodeKind,
 } from "../db/space.ts";
@@ -25,25 +24,27 @@ function usage(): string {
 Usage:
   dviz init [--db PATH]
   dviz serve [--db PATH] [--port PORT]
-  dviz question add "TITLE" [--parent ID] [--detail TEXT]
-  dviz question update ID [--title TEXT] [--detail TEXT]
-  dviz question lean ID --option ID
-  dviz question decide ID --option ID
-  dviz question reopen ID
-  dviz option add --question ID "TITLE" [--detail TEXT]
-  dviz criterion add SLUG [--desc TEXT]
-  dviz assess --option ID --criterion SLUG --polarity +|-|~|? [--note TEXT]
-  dviz relate --question ID --criterion SLUG
-  dviz accept KIND ID
-  dviz remove KIND ID
-  dviz focus KIND ID
-  dviz outline [--depth N] [--around QUESTION_ID]
-  dviz show KIND ID
+  dviz question add SLUG "TITLE" [--parent QSLUG] [--detail TEXT]
+  dviz question update QSLUG [--slug NEW] [--title TEXT] [--detail TEXT]
+  dviz question lean QSLUG --option OSLUG
+  dviz question decide QSLUG --option OSLUG
+  dviz question reopen QSLUG
+  dviz option add --question QSLUG SLUG "TITLE" [--detail TEXT]
+  dviz option update QSLUG/OSLUG [--slug NEW] [--title TEXT] [--detail TEXT]
+  dviz criterion add CSLUG [--desc TEXT]
+  dviz assess --option QSLUG/OSLUG --criterion CSLUG --polarity +|-|~|? [--note TEXT]
+  dviz relate --question QSLUG --criterion CSLUG
+  dviz accept KIND SLUG
+  dviz remove KIND SLUG
+  dviz focus KIND SLUG
+  dviz outline [--depth N] [--around QSLUG]
+  dviz show KIND SLUG
   dviz log [--since EDIT_ID|TIMESTAMP]
 
 All server-backed commands also accept --db PATH and --url URL.
-Edge IDs: assessment OPTION:SLUG, relation QUESTION:SLUG,
-placement CHILD:PARENT (use CHILD:root for a root placement).
+Option references outside a named question use QSLUG/OSLUG.
+Edge references: assessment QSLUG/OSLUG:CSLUG, relation QSLUG:CSLUG,
+placement CHILD_QSLUG:PARENT_QSLUG (use CHILD_QSLUG:root at the root).
 `;
 }
 
@@ -56,6 +57,13 @@ function takeOption(args: string[], name: string): string | undefined {
   return value;
 }
 
+function takeFlag(args: string[], name: string): boolean {
+  const index = args.indexOf(name);
+  if (index === -1) return false;
+  args.splice(index, 1);
+  return true;
+}
+
 function parsePositiveInteger(value: string | undefined, label: string): number | undefined {
   if (value === undefined) return undefined;
   const parsed = Number(value);
@@ -63,15 +71,14 @@ function parsePositiveInteger(value: string | undefined, label: string): number 
   return parsed;
 }
 
-function requirePositiveInteger(value: string | undefined, label: string): number {
-  const parsed = parsePositiveInteger(value, label);
-  if (parsed === undefined) throw new Error(`${label} is required.`);
-  return parsed;
-}
-
 function requireOption(args: string[], name: string): string {
   const value = takeOption(args, name);
   if (value === undefined) throw new Error(`${name} is required.`);
+  return value;
+}
+
+function requireArgument(value: string | undefined, label: string): string {
+  if (!value) throw new Error(`${label} is required.`);
   return value;
 }
 
@@ -130,10 +137,7 @@ function client(args: string[]): Client {
   const explicitDb = takeOption(args, "--db");
   const urlOverride = takeOption(args, "--url") ?? process.env.DVIZ_URL;
   const dbPath = findDbPath(process.cwd(), explicitDb);
-  return {
-    baseUrl: urlOverride ?? readServerInfo(dbPath).url,
-    actor: process.env.DVIZ_ACTOR?.trim() || "agent:cli",
-  };
+  return { baseUrl: urlOverride ?? readServerInfo(dbPath).url, actor: process.env.DVIZ_ACTOR?.trim() || "agent:cli" };
 }
 
 async function request(clientInfo: Client, path: string, init?: RequestInit): Promise<Response> {
@@ -169,46 +173,61 @@ async function questionCommand(args: string[]): Promise<void> {
   const verb = args.shift();
   const clientInfo = client(args);
   if (verb === "add") {
-    const parentId = parsePositiveInteger(takeOption(args, "--parent"), "--parent") ?? null;
+    const parentSlug = takeOption(args, "--parent") ?? null;
     const detail = takeOption(args, "--detail") ?? "";
-    if (args.length !== 1) throw new Error("`dviz question add` requires exactly one quoted title.");
-    const result = await command(clientInfo, "question.add", { title: args[0], detail, parentId }) as { id: number; title: string };
-    console.log(`Added suggested question ${result.id}: ${result.title}`);
+    if (args.length !== 2) throw new Error("`dviz question add` requires a slug and one quoted title.");
+    const result = await command(clientInfo, "question.add", { slug: args[0], title: args[1], detail, parentSlug }) as { slug: string; title: string };
+    console.log(`Added suggested question ${result.slug}: ${result.title}`);
     return;
   }
-  const id = requirePositiveInteger(args.shift(), "question ID");
+  const questionSlug = requireArgument(args.shift(), "question slug");
   if (verb === "update") {
+    const slug = takeOption(args, "--slug");
     const title = takeOption(args, "--title");
     const detail = takeOption(args, "--detail");
     assertNoExtraArgs(args);
-    const result = await command(clientInfo, "question.update", { id, title, detail }) as { title: string };
-    console.log(`Updated question ${id}: ${result.title}`);
+    const result = await command(clientInfo, "question.update", { questionSlug, slug, title, detail }) as { slug: string; title: string };
+    console.log(`Updated question ${result.slug}: ${result.title}`);
     return;
   }
   if (verb === "lean" || verb === "decide") {
-    const optionId = requirePositiveInteger(requireOption(args, "--option"), "--option");
+    const optionSlug = requireOption(args, "--option");
     assertNoExtraArgs(args);
-    await command(clientInfo, `question.${verb}`, { id, optionId });
-    console.log(`${verb === "lean" ? "Leaning" : "Decided"} question ${id} on option ${optionId}`);
+    await command(clientInfo, `question.${verb}`, { questionSlug, optionSlug });
+    console.log(`${verb === "lean" ? "Leaning" : "Decided"} question ${questionSlug} on option ${optionSlug}`);
     return;
   }
   if (verb === "reopen") {
     assertNoExtraArgs(args);
-    await command(clientInfo, "question.reopen", { id });
-    console.log(`Reopened question ${id}`);
+    await command(clientInfo, "question.reopen", { questionSlug });
+    console.log(`Reopened question ${questionSlug}`);
     return;
   }
   throw new Error("Question command must be add, update, lean, decide, or reopen.");
 }
 
 async function optionCommand(args: string[]): Promise<void> {
-  if (args.shift() !== "add") throw new Error("Option command must be add.");
+  const verb = args.shift();
   const clientInfo = client(args);
-  const questionId = requirePositiveInteger(requireOption(args, "--question"), "--question");
-  const detail = takeOption(args, "--detail") ?? "";
-  if (args.length !== 1) throw new Error("`dviz option add` requires exactly one quoted title.");
-  const result = await command(clientInfo, "option.add", { questionId, title: args[0], detail }) as { id: number; title: string };
-  console.log(`Added suggested option ${result.id}: ${result.title}`);
+  if (verb === "add") {
+    const questionSlug = requireOption(args, "--question");
+    const detail = takeOption(args, "--detail") ?? "";
+    if (args.length !== 2) throw new Error("`dviz option add` requires a slug and one quoted title.");
+    const result = await command(clientInfo, "option.add", { questionSlug, slug: args[0], title: args[1], detail }) as { questionSlug: string; slug: string; title: string };
+    console.log(`Added suggested option ${result.questionSlug}/${result.slug}: ${result.title}`);
+    return;
+  }
+  if (verb === "update") {
+    const optionPath = requireArgument(args.shift(), "option path");
+    const slug = takeOption(args, "--slug");
+    const title = takeOption(args, "--title");
+    const detail = takeOption(args, "--detail");
+    assertNoExtraArgs(args);
+    const result = await command(clientInfo, "option.update", { optionPath, slug, title, detail }) as { questionSlug: string; slug: string; title: string };
+    console.log(`Updated option ${result.questionSlug}/${result.slug}: ${result.title}`);
+    return;
+  }
+  throw new Error("Option command must be add or update.");
 }
 
 async function criterionCommand(args: string[]): Promise<void> {
@@ -216,28 +235,28 @@ async function criterionCommand(args: string[]): Promise<void> {
   const clientInfo = client(args);
   const description = takeOption(args, "--desc") ?? "";
   if (args.length !== 1) throw new Error("`dviz criterion add` requires exactly one slug.");
-  const result = await command(clientInfo, "criterion.add", { slug: args[0], description }) as { id: number; slug: string };
-  console.log(`Added suggested criterion ${result.id}: ${result.slug}`);
+  const result = await command(clientInfo, "criterion.add", { slug: args[0], description }) as { slug: string };
+  console.log(`Added suggested criterion ${result.slug}`);
 }
 
 async function assess(args: string[]): Promise<void> {
   const clientInfo = client(args);
-  const optionId = requirePositiveInteger(requireOption(args, "--option"), "--option");
+  const optionPath = requireOption(args, "--option");
   const criterionSlug = requireOption(args, "--criterion");
   const polarity = requireOption(args, "--polarity");
   const note = takeOption(args, "--note") ?? "";
   assertNoExtraArgs(args);
-  const result = await command(clientInfo, "assess", { optionId, criterionSlug, polarity, note }) as { acceptance: string };
-  console.log(`Assessed option ${optionId} ${polarity} ${criterionSlug} [${result.acceptance}]`);
+  const result = await command(clientInfo, "assess", { optionPath, criterionSlug, polarity, note }) as { acceptance: string };
+  console.log(`Assessed option ${optionPath} ${polarity} ${criterionSlug} [${result.acceptance}]`);
 }
 
 async function relate(args: string[]): Promise<void> {
   const clientInfo = client(args);
-  const questionId = requirePositiveInteger(requireOption(args, "--question"), "--question");
+  const questionSlug = requireOption(args, "--question");
   const criterionSlug = requireOption(args, "--criterion");
   assertNoExtraArgs(args);
-  await command(clientInfo, "relate", { questionId, criterionSlug });
-  console.log(`Related suggested criterion ${criterionSlug} to question ${questionId}`);
+  await command(clientInfo, "relate", { questionSlug, criterionSlug });
+  console.log(`Related suggested criterion ${criterionSlug} to question ${questionSlug}`);
 }
 
 function parseKind(value: string | undefined): EntityKind {
@@ -254,44 +273,34 @@ function parseNodeKind(value: string | undefined): NodeKind {
   return value as NodeKind;
 }
 
-function parseReference(kind: EntityKind, value: string | undefined): number | EdgeReference {
-  if (kind === "question" || kind === "option" || kind === "criterion") return requirePositiveInteger(value, "ID");
-  if (!value) throw new Error(`${kind} reference is required.`);
-  const separator = value.indexOf(":");
-  if (separator < 1 || separator === value.length - 1) throw new Error(`${kind} reference must use FIRST:SECOND form.`);
-  return {
-    firstId: requirePositiveInteger(value.slice(0, separator), `${kind} first ID`),
-    second: value.slice(separator + 1),
-  };
-}
-
 async function mutateEntity(action: "accept" | "remove", args: string[]): Promise<void> {
   const clientInfo = client(args);
   const kind = parseKind(args.shift());
-  const rawReference = args.shift();
-  const reference = parseReference(kind, rawReference);
+  const reference = requireArgument(args.shift(), `${kind} reference`);
   assertNoExtraArgs(args);
   await command(clientInfo, action, { kind, reference });
-  console.log(`${action === "accept" ? "Accepted" : "Removed"} ${kind} ${rawReference}`);
+  console.log(`${action === "accept" ? "Accepted" : "Removed"} ${kind} ${reference}`);
 }
 
 async function focus(args: string[]): Promise<void> {
   const clientInfo = client(args);
   const kind = parseNodeKind(args.shift());
-  const id = requirePositiveInteger(args.shift(), "ID");
+  const reference = requireArgument(args.shift(), `${kind} reference`);
   assertNoExtraArgs(args);
-  await command(clientInfo, "focus", { kind, id });
-  console.log(`Focused ${kind} ${id}`);
+  await command(clientInfo, "focus", { kind, reference });
+  console.log(`Focused ${kind} ${reference}`);
 }
 
 async function outline(args: string[]): Promise<void> {
   const clientInfo = client(args);
   const depth = parsePositiveInteger(takeOption(args, "--depth"), "--depth");
-  const around = parsePositiveInteger(takeOption(args, "--around"), "--around");
+  const around = takeOption(args, "--around");
+  const ids = takeFlag(args, "--ids");
   assertNoExtraArgs(args);
   const query = new URLSearchParams();
   if (depth !== undefined) query.set("depth", String(depth));
-  if (around !== undefined) query.set("around", String(around));
+  if (around !== undefined) query.set("around", around);
+  if (ids) query.set("ids", "");
   const response = await request(clientInfo, `/api/outline.md${query.size ? `?${query}` : ""}`);
   process.stdout.write(await response.text());
 }
@@ -299,9 +308,9 @@ async function outline(args: string[]): Promise<void> {
 async function show(args: string[]): Promise<void> {
   const clientInfo = client(args);
   const kind = parseNodeKind(args.shift());
-  const id = requirePositiveInteger(args.shift(), "ID");
+  const reference = requireArgument(args.shift(), `${kind} reference`);
   assertNoExtraArgs(args);
-  const response = await request(clientInfo, `/api/show/${kind}/${id}`);
+  const response = await request(clientInfo, `/api/show/${kind}/${encodeURIComponent(reference)}`);
   process.stdout.write(await response.text());
 }
 

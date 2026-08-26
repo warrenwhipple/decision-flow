@@ -1,8 +1,9 @@
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS questions (
   id INTEGER PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
   title TEXT NOT NULL,
   detail TEXT NOT NULL DEFAULT '',
   acceptance TEXT NOT NULL DEFAULT 'suggested'
@@ -26,13 +27,15 @@ CREATE TABLE IF NOT EXISTS question_parents (
 CREATE TABLE IF NOT EXISTS options (
   id INTEGER PRIMARY KEY,
   question_id INTEGER NOT NULL REFERENCES questions(id),
+  slug TEXT NOT NULL,
   title TEXT NOT NULL,
   detail TEXT NOT NULL DEFAULT '',
   acceptance TEXT NOT NULL DEFAULT 'suggested'
     CHECK (acceptance IN ('suggested', 'accepted')),
   position REAL NOT NULL,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  UNIQUE (question_id, slug)
 );
 
 CREATE TABLE IF NOT EXISTS criteria (

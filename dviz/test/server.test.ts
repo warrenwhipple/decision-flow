@@ -8,6 +8,7 @@ import { startServer, type DvizServer } from "../src/server/server.ts";
 
 const temporaryDirectories: string[] = [];
 const servers: DvizServer[] = [];
+const cliPath = join(import.meta.dir, "../src/cli/index.ts");
 
 async function availablePort(): Promise<number> {
   const probe = createServer();
@@ -23,12 +24,25 @@ async function availablePort(): Promise<number> {
 
 afterEach(() => {
   for (const server of servers.splice(0)) server.stop(true);
-  for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
-  }
+  for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
 });
 
-test("POST /api/questions persists and broadcasts an outline SSE event", async () => {
+async function runCli(dbPath: string, server: DvizServer, ...args: string[]): Promise<string> {
+  const process = Bun.spawn(["bun", cliPath, ...args, "--db", dbPath, "--url", server.url], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...globalThis.process.env, DVIZ_ACTOR: "agent:test-cli" },
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(process.stdout).text(),
+    new Response(process.stderr).text(),
+    process.exited,
+  ]);
+  if (exitCode !== 0) throw new Error(stderr);
+  return stdout;
+}
+
+test("POST /api/questions persists a slug and broadcasts an ID-free outline SSE event", async () => {
   const directory = mkdtempSync(join(tmpdir(), "dviz-server-test-"));
   temporaryDirectories.push(directory);
   const dbPath = join(directory, "space.db");
@@ -46,20 +60,20 @@ test("POST /api/questions persists and broadcasts an outline SSE event", async (
   const response = await fetch(`${server.url}/api/questions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: "Appears live", actor: "agent:test" }),
+    body: JSON.stringify({ slug: "appears-live", title: "Appears live", actor: "agent:test" }),
   });
   expect(response.status).toBe(201);
   expect(await response.json()).toMatchObject({
-    question: { id: 1, title: "Appears live", acceptance: "suggested" },
+    question: { slug: "appears-live", title: "Appears live", acceptance: "suggested" },
   });
 
   const update = decoder.decode((await reader.read()).value);
-  expect(update).toContain('event: outline');
-  expect(update).toContain('"title":"Appears live"');
+  expect(update).toContain('"slug":"appears-live"');
+  expect(update).not.toMatch(/"(?:id|questionId|childId|parentId)"/);
   await reader.cancel();
 });
 
-test("command and projection APIs cover the v0 CLI lifecycle", async () => {
+test("command and projection APIs cover the slug-first v0 CLI lifecycle", async () => {
   const directory = mkdtempSync(join(tmpdir(), "dviz-server-test-"));
   temporaryDirectories.push(directory);
   const dbPath = join(directory, "space.db");
@@ -77,25 +91,67 @@ test("command and projection APIs cover the v0 CLI lifecycle", async () => {
     return (await response.json() as { result: Record<string, unknown> }).result;
   };
 
-  const question = await run("question.add", { title: "Choose a route" });
-  const option = await run("option.add", { questionId: question.id, title: "Northern route" });
+  await run("question.add", { slug: "route", title: "Choose a route" });
+  await run("question.update", { questionSlug: "route", slug: "travel-route" });
+  await run("option.add", { questionSlug: "travel-route", slug: "north", title: "Northern route" });
+  await run("option.update", { optionPath: "travel-route/north", slug: "northern" });
   const criterion = await run("criterion.add", { slug: "speed", description: "Arrive sooner" });
-  await run("assess", { optionId: option.id, criterionSlug: "speed", polarity: "+", note: "Direct" });
-  await run("relate", { questionId: question.id, criterionSlug: "speed" });
-  await run("question.decide", { id: question.id, optionId: option.id });
-  await run("accept", { kind: "question", reference: question.id });
-  await run("accept", { kind: "placement", reference: { firstId: question.id, second: "root" } });
+  await run("assess", { optionPath: "travel-route/northern", criterionSlug: "speed", polarity: "+", note: "Direct" });
+  await run("relate", { questionSlug: "travel-route", criterionSlug: "speed" });
+  await run("question.decide", { questionSlug: "travel-route", optionSlug: "northern" });
+  await run("accept", { kind: "question", reference: "travel-route" });
+  await run("accept", { kind: "placement", reference: "travel-route:root" });
 
   const outline = await (await fetch(`${server.url}/api/outline`)).json() as Record<string, unknown[]>;
   expect(outline).toMatchObject({
-    questions: [{ resolution: "decided", resolvedOptionId: option.id, acceptance: "accepted" }],
-    placements: [{ acceptance: "accepted" }],
-    options: [{ title: "Northern route", acceptance: "suggested" }],
+    questions: [{ slug: "travel-route", resolution: "decided", resolvedOptionSlug: "northern", acceptance: "accepted" }],
+    placements: [{ childSlug: "travel-route", parentSlug: null, acceptance: "accepted" }],
+    options: [{ questionSlug: "travel-route", slug: "northern", acceptance: "suggested" }],
   });
+  expect(JSON.stringify(outline)).not.toMatch(/"(?:id|questionId|childId|parentId|resolvedOptionId)"/);
   expect(await (await fetch(`${server.url}/api/outline.md`)).text())
-    .toContain(`● Q${question.id} Choose a route → O${option.id}`);
-  expect(await (await fetch(`${server.url}/api/show/option/${option.id}`)).text())
+    .toContain("● travel-route: Choose a route → northern");
+  expect(await (await fetch(`${server.url}/api/show/option/travel-route%2Fnorthern`)).text())
     .toContain("+ speed [suggested] — Direct");
-  expect(await (await fetch(`${server.url}/api/log`)).text()).toContain("decide question");
+  const log = await (await fetch(`${server.url}/api/log`)).text();
+  expect(log).toContain("rename question");
+  expect(log).toContain('"question":"travel-route"');
   expect(criterion.slug).toBe("speed");
+});
+
+test("slug validation failures stay readable at the HTTP boundary", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "dviz-server-test-"));
+  temporaryDirectories.push(directory);
+  const dbPath = join(directory, "space.db");
+  initializeSpace(dbPath).close();
+  const server = await startServer({ dbPath, port: await availablePort() });
+  servers.push(server);
+
+  const response = await fetch(`${server.url}/api/command`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "question.add", slug: "123", title: "Bad", actor: "agent:test" }),
+  });
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({ error: expect.stringContaining("Question slug must start with a letter") });
+});
+
+test("the real CLI parses slug-first question, option, status, and projection commands", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "dviz-cli-test-"));
+  temporaryDirectories.push(directory);
+  const dbPath = join(directory, "space.db");
+  initializeSpace(dbPath).close();
+  const server = await startServer({ dbPath, port: await availablePort() });
+  servers.push(server);
+
+  expect(await runCli(dbPath, server, "question", "add", "route", "Choose a route"))
+    .toContain("Added suggested question route");
+  expect(await runCli(dbPath, server, "option", "add", "--question", "route", "north", "Northern route"))
+    .toContain("route/north");
+  expect(await runCli(dbPath, server, "option", "update", "route/north", "--slug", "northern"))
+    .toContain("route/northern");
+  expect(await runCli(dbPath, server, "question", "decide", "route", "--option", "northern"))
+    .toContain("Decided question route on option northern");
+  expect(await runCli(dbPath, server, "outline")).toContain("● route: Choose a route → northern");
+  expect(await runCli(dbPath, server, "show", "option", "route/northern")).toContain("# route/northern: Northern route");
 });
