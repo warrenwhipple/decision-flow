@@ -78,6 +78,9 @@ export type OutlineSnapshot = {
   questions: Question[];
   placements: Placement[];
   options: Option[];
+  criteria: Criterion[];
+  assessments: Assessment[];
+  relations: Relation[];
 };
 
 export type AddQuestionInput = {
@@ -645,6 +648,23 @@ export function getOutline(db: Database): OutlineSnapshot {
   const optionRows = db.query(`SELECT q.slug AS question_slug, o.slug, o.title, o.detail, o.acceptance,
     o.position, o.created_at, o.updated_at FROM options o JOIN questions q ON q.id = o.question_id
     ORDER BY o.question_id, o.position, o.id`).all() as Record<string, unknown>[];
+  const criterionRows = db.query(`SELECT DISTINCT c.slug, c.description, c.acceptance, c.created_at, c.updated_at
+    FROM criteria c
+    WHERE EXISTS (SELECT 1 FROM question_criteria qc WHERE qc.criterion_id = c.id)
+       OR EXISTS (SELECT 1 FROM assessments a WHERE a.criterion_id = c.id)
+    ORDER BY c.slug`).all() as Record<string, unknown>[];
+  const assessmentRows = db.query(`SELECT q.slug AS question_slug, o.slug AS option_slug,
+    c.slug AS criterion_slug, a.polarity, a.note, a.acceptance
+    FROM assessments a
+    JOIN options o ON o.id = a.option_id
+    JOIN questions q ON q.id = o.question_id
+    JOIN criteria c ON c.id = a.criterion_id
+    ORDER BY o.question_id, o.position, c.slug`).all() as Record<string, unknown>[];
+  const relationRows = db.query(`SELECT q.slug AS question_slug, c.slug AS criterion_slug, qc.acceptance
+    FROM question_criteria qc
+    JOIN questions q ON q.id = qc.question_id
+    JOIN criteria c ON c.id = qc.criterion_id
+    ORDER BY q.id, c.slug`).all() as Record<string, unknown>[];
   return {
     questions: questionRows.map(mapQuestion),
     placements: placementRows.map((row) => ({
@@ -652,6 +672,13 @@ export function getOutline(db: Database): OutlineSnapshot {
       position: Number(row.position), acceptance: row.acceptance as Acceptance,
     })),
     options: optionRows.map(mapOption),
+    criteria: criterionRows.map(mapCriterion),
+    assessments: assessmentRows.map(mapAssessment),
+    relations: relationRows.map((row) => ({
+      questionSlug: String(row.question_slug),
+      criterionSlug: String(row.criterion_slug),
+      acceptance: row.acceptance as Acceptance,
+    })),
   };
 }
 

@@ -144,6 +144,15 @@ describe("decision space", () => {
     setQuestionResolution(db, "travel-route", "decided", "north", "human");
     setFocus(db, "question", "travel-route", "agent:test");
 
+    expect(getOutline(db)).toMatchObject({
+      criteria: [{ slug: "focus-flow", description: "Preserves focus.", acceptance: "accepted" }],
+      assessments: [{
+        optionPath: "travel-route/north", criterionSlug: "focus-flow", polarity: "+",
+        note: "Few interruptions.", acceptance: "accepted",
+      }],
+      relations: [{ questionSlug: "travel-route", criterionSlug: "focus-flow", acceptance: "accepted" }],
+    });
+    expect(JSON.stringify(getOutline(db))).not.toMatch(/"(?:id|questionId|optionId|criterionId)"/);
     expect(renderOutline(db)).toContain("● travel-route: Which path now? → north");
     expect(renderOutline(db)).toContain("- north");
     expect(renderOutline(db)).not.toContain("[suggested]");

@@ -38,6 +38,7 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
   - thin slice works
   - full CLI, statuses, dotted rendering works
   - spec and code updated to be slug first
+  - zoomed decisions and assessment chip work
 
 ## Possible future direction
 
