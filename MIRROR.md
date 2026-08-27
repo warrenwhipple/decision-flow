@@ -39,6 +39,7 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
   - full CLI, statuses, dotted rendering works
   - spec and code updated to be slug first
   - zoomed decisions and assessment chip work
+  - focus and follow mode work with demo flag in html window obj
 
 ## Possible future direction
 

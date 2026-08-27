@@ -145,6 +145,7 @@ describe("decision space", () => {
     setFocus(db, "question", "travel-route", "agent:test");
 
     expect(getOutline(db)).toMatchObject({
+      focus: { kind: "question", reference: "travel-route" },
       criteria: [{ slug: "focus-flow", description: "Preserves focus.", acceptance: "accepted" }],
       assessments: [{
         optionPath: "travel-route/north", criterionSlug: "focus-flow", polarity: "+",
@@ -162,6 +163,27 @@ describe("decision space", () => {
 
     setQuestionResolution(db, "travel-route", "open", null, "human");
     expect(getOutline(db).questions[0]).toMatchObject({ resolution: "open", resolvedOptionSlug: null });
+    db.close();
+  });
+
+  test("projects focus through stable slug references and clears it with its node", () => {
+    const { db } = testSpace();
+    addQuestion(db, { slug: "route", title: "Which route?", actor: "agent:test" });
+    addOption(db, { questionSlug: "route", slug: "north", title: "Go north", actor: "agent:test" });
+    addCriterion(db, { slug: "speed", description: "Arrive sooner", actor: "agent:test" });
+
+    setFocus(db, "option", "route/north", "agent:test");
+    expect(getOutline(db).focus).toMatchObject({ kind: "option", reference: "route/north" });
+    updateOption(db, "route/north", { slug: "northern", actor: "agent:test" });
+    expect(getOutline(db).focus).toMatchObject({ kind: "option", reference: "route/northern" });
+
+    setFocus(db, "criterion", "speed", "agent:test");
+    expect(getOutline(db)).toMatchObject({
+      focus: { kind: "criterion", reference: "speed" },
+      criteria: [{ slug: "speed" }],
+    });
+    removeEntity(db, "criterion", "speed", "human");
+    expect(getOutline(db).focus).toBeNull();
     db.close();
   });
 

@@ -99,6 +99,7 @@ test("command and projection APIs cover the slug-first v0 CLI lifecycle", async 
   await run("assess", { optionPath: "travel-route/northern", criterionSlug: "speed", polarity: "+", note: "Direct" });
   await run("relate", { questionSlug: "travel-route", criterionSlug: "speed" });
   await run("question.decide", { questionSlug: "travel-route", optionSlug: "northern" });
+  await run("focus", { kind: "option", reference: "travel-route/northern" });
   await run("accept", { kind: "question", reference: "travel-route" });
   await run("accept", { kind: "placement", reference: "travel-route:root" });
 
@@ -107,6 +108,7 @@ test("command and projection APIs cover the slug-first v0 CLI lifecycle", async 
     questions: [{ slug: "travel-route", resolution: "decided", resolvedOptionSlug: "northern", acceptance: "accepted" }],
     placements: [{ childSlug: "travel-route", parentSlug: null, acceptance: "accepted" }],
     options: [{ questionSlug: "travel-route", slug: "northern", acceptance: "suggested" }],
+    focus: { kind: "option", reference: "travel-route/northern" },
   });
   expect(JSON.stringify(outline)).not.toMatch(/"(?:id|questionId|childId|parentId|resolvedOptionId)"/);
   expect(await (await fetch(`${server.url}/api/outline.md`)).text())
@@ -152,6 +154,8 @@ test("the real CLI parses slug-first question, option, status, and projection co
     .toContain("route/northern");
   expect(await runCli(dbPath, server, "question", "decide", "route", "--option", "northern"))
     .toContain("Decided question route on option northern");
+  expect(await runCli(dbPath, server, "focus", "option", "route/northern"))
+    .toContain("Focused option route/northern");
   expect(await runCli(dbPath, server, "outline")).toContain("● route: Choose a route → northern");
   expect(await runCli(dbPath, server, "show", "option", "route/northern")).toContain("# route/northern: Northern route");
 });

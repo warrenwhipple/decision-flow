@@ -65,6 +65,12 @@ export type Relation = {
   acceptance: Acceptance;
 };
 
+export type Focus = {
+  kind: NodeKind;
+  reference: string;
+  setAt: string;
+};
+
 export type Edit = {
   id: number;
   ts: string;
@@ -81,6 +87,7 @@ export type OutlineSnapshot = {
   criteria: Criterion[];
   assessments: Assessment[];
   relations: Relation[];
+  focus: Focus | null;
 };
 
 export type AddQuestionInput = {
@@ -586,6 +593,33 @@ export function setFocus(db: Database, kind: NodeKind, reference: string, actor:
   })();
 }
 
+export function getFocus(db: Database): Focus | null {
+  const row = db.query("SELECT kind, node_id, set_at FROM focus WHERE row_lock = 1").get() as {
+    kind: NodeKind;
+    node_id: number;
+    set_at: string;
+  } | null;
+  if (!row) return null;
+
+  let reference: string | null = null;
+  if (row.kind === "question") {
+    const question = db.query("SELECT slug FROM questions WHERE id = ?").get(row.node_id) as { slug: string } | null;
+    reference = question?.slug ?? null;
+  } else if (row.kind === "option") {
+    const option = db.query(`SELECT q.slug AS question_slug, o.slug AS option_slug
+      FROM options o JOIN questions q ON q.id = o.question_id WHERE o.id = ?`).get(row.node_id) as {
+      question_slug: string;
+      option_slug: string;
+    } | null;
+    reference = option ? optionPath(option.question_slug, option.option_slug) : null;
+  } else if (row.kind === "criterion") {
+    const criterion = db.query("SELECT slug FROM criteria WHERE id = ?").get(row.node_id) as { slug: string } | null;
+    reference = criterion?.slug ?? null;
+  }
+
+  return reference === null ? null : { kind: row.kind, reference, setAt: row.set_at };
+}
+
 export function getQuestion(db: Database, slug: string): Question {
   return getQuestionById(db, questionRecord(db, slug).id);
 }
@@ -652,6 +686,7 @@ export function getOutline(db: Database): OutlineSnapshot {
     FROM criteria c
     WHERE EXISTS (SELECT 1 FROM question_criteria qc WHERE qc.criterion_id = c.id)
        OR EXISTS (SELECT 1 FROM assessments a WHERE a.criterion_id = c.id)
+       OR EXISTS (SELECT 1 FROM focus f WHERE f.kind = 'criterion' AND f.node_id = c.id)
     ORDER BY c.slug`).all() as Record<string, unknown>[];
   const assessmentRows = db.query(`SELECT q.slug AS question_slug, o.slug AS option_slug,
     c.slug AS criterion_slug, a.polarity, a.note, a.acceptance
@@ -679,6 +714,7 @@ export function getOutline(db: Database): OutlineSnapshot {
       criterionSlug: String(row.criterion_slug),
       acceptance: row.acceptance as Acceptance,
     })),
+    focus: getFocus(db),
   };
 }
 
