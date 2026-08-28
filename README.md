@@ -6,10 +6,13 @@ The core bet: for ambiguous product and engineering work, the useful top-level o
 
 ## Current Prototypes
 
-This repo contains small, closely related prototype skills for decision-centered work.
+This repo contains a decision visualizer and small, closely related prototype skills for decision-centered work.
 
 Start here:
 
+- [`dviz/`](dviz/) - the `dviz` decision visualizer (CLI + local server + live outline view), the current focus
+- [`skills/dviz/SKILL.md`](skills/dviz/SKILL.md) - the agent skill for capturing a deliberation through the `dviz` CLI
+- [`docs/visualizer-v0-spec.md`](docs/visualizer-v0-spec.md) - visualizer design and build order
 - [`skills/decision-mode/SKILL.md`](skills/decision-mode/SKILL.md) - the prototype agent behavior
 - [`skills/deliberate/SKILL.md`](skills/deliberate/SKILL.md) - interview a problem one decision at a time without writing files
 - [`skills/to-decisions/SKILL.md`](skills/to-decisions/SKILL.md) - capture decision state from an existing conversation
@@ -18,6 +21,20 @@ Start here:
 - [`docs/experience/`](docs/experience/) - timestamped dogfood notes and observations
 - [`docs/experience/insights.md`](docs/experience/insights.md) - tracking and synthesis of dogfood notes
 - [`docs/reports/`](docs/reports/) - timestamped research and capability reports
+
+## dviz
+
+`dviz` is a local decision visualizer. You run `dviz serve` in a project and keep the outline view open beside your agent conversation; the agent captures questions, options, criteria, and assessments through the `dviz` CLI, and each one appears live. Agent-created nodes land as *suggested* (rendered dotted) until you accept them, and accepting, leaning, deciding, and removing stay human verbs. Slugs are the shared handle between you, the agent, and the view.
+
+State is a repo-local, gitignored `.dviz/space.db` behind the server. The `dviz` skill teaches the agent the CLI, the suggest-never-settle rule, and slug-minting heuristics.
+
+```sh
+cd dviz && bun install && bun link   # global `dviz` binary
+cd ../some-project
+dviz init                            # creates .dviz/ and gitignores it
+dviz serve                           # starts the server and view
+dviz --help                          # full command surface
+```
 
 ## Decision Mode
 
@@ -39,8 +56,8 @@ It records progress in a `DECISION.md` file — created per working session in w
 
 Run `scripts/link-skills.sh` to link the repo's skills into the user-level skill directories used by Codex, Cursor, and Claude Code. The links point back to this checkout, so skill edits are immediately available for dogfooding without copying files. Existing real directories at the same skill names are moved to timestamped backups; unrelated installed skills remain in place. Harnesses may need a new session to reload changed instructions.
 
-Invoke the skills explicitly with `$decision-mode`, `$deliberate`, or `$to-decisions` in Codex, and with the corresponding slash command in Claude Code and Cursor. All three prototype skills are user-invoked-only; see [`docs/manual-only-skills.md`](docs/manual-only-skills.md) for the harness metadata. OpenCode manual-only adapters are intentionally deferred.
+Invoke the skills explicitly with `$dviz`, `$decision-mode`, `$deliberate`, or `$to-decisions` in Codex, and with the corresponding slash command in Claude Code and Cursor. All four skills are user-invoked-only; see [`docs/manual-only-skills.md`](docs/manual-only-skills.md) for the harness metadata. OpenCode manual-only adapters are intentionally deferred.
 
 ## Status
 
-Early public iteration. The repo is intentionally small while the skills are being dogfooded; expect rough edges and fast changes.
+Early public iteration. Current work is on the `dviz` visualizer; `decision-mode`, `deliberate`, and `to-decisions` are parked. The repo is intentionally small while things are being dogfooded; expect rough edges and fast changes.

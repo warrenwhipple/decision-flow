@@ -1,0 +1,7 @@
+interface:
+  display_name: "Dviz"
+  short_description: "Capture deliberation live through the dviz CLI"
+  default_prompt: "Use $dviz to capture our deliberation into the live decision view."
+
+policy:
+  allow_implicit_invocation: false

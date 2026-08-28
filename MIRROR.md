@@ -28,7 +28,7 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
 
 ## Recent changes ready to dogfood
 
-- visualizer waiting on appropriate agent skill
+- dviz CLI and skill
 
 ## Status at a glance
 
@@ -40,6 +40,7 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
   - spec and code updated to be slug first
   - zoomed decisions and assessment chip work
   - focus and follow mode work with demo flag in html window obj
+  - dviz skill added
 
 ## Possible future direction
 
