@@ -4,6 +4,7 @@ import {
   acceptEntity,
   addCriterion,
   addOption,
+  addPlacement,
   addQuestion,
   DEFAULT_PORT,
   getOutline,
@@ -245,6 +246,12 @@ export async function startServer(options: StartServerOptions): Promise<DvizServ
             result = addCriterion(db, {
               slug: requiredString(body.slug, "slug"),
               description: typeof body.description === "string" ? body.description : "",
+              actor,
+            });
+          } else if (action === "place") {
+            result = addPlacement(db, {
+              childSlug: requiredString(body.childSlug, "childSlug"),
+              parentSlug: requiredString(body.parentSlug, "parentSlug"),
               actor,
             });
           } else if (action === "assess") {

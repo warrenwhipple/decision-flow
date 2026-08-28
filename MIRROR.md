@@ -28,7 +28,7 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
 
 ## Recent changes ready to dogfood
 
-- No, waiting on visualizer prototype
+- visualizer waiting on appropriate agent skill
 
 ## Status at a glance
 
@@ -43,4 +43,4 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
 
 ## Possible future direction
 
-- If visualizer feels good, consider how `delierate` and `to-decisions` compose with it
+- If visualizer feels good, consider how `deliberate` and `to-decisions` compose with it

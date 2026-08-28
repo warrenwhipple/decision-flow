@@ -30,6 +30,7 @@ export type Placement = {
   parentSlug: string | null;
   position: number;
   acceptance: Acceptance;
+  canonical: boolean;
 };
 
 export type Option = {
@@ -304,6 +305,35 @@ export function addQuestion(db: Database, input: AddQuestionInput): Question {
     return questionId;
   })();
   return getQuestionById(db, id);
+}
+
+export function addPlacement(db: Database, input: { childSlug: string; parentSlug: string; actor: string }): Placement {
+  const placement = db.transaction(() => {
+    const child = questionRecord(db, input.childSlug);
+    const parent = questionRecord(db, input.parentSlug);
+    if (child.id === parent.id) throw new Error(`Question ${child.slug} cannot be placed under itself.`);
+    if (db.query("SELECT 1 FROM question_parents WHERE child_id = ? AND parent_id = ?").get(child.id, parent.id)) {
+      throw new Error(`Question ${child.slug} is already placed under ${parent.slug}.`);
+    }
+    const createsCycle = db.query(`WITH RECURSIVE descendants(id) AS (
+      SELECT child_id FROM question_parents WHERE parent_id = ?
+      UNION
+      SELECT qp.child_id FROM question_parents qp JOIN descendants d ON qp.parent_id = d.id
+    ) SELECT 1 FROM descendants WHERE id = ? LIMIT 1`).get(child.id, parent.id);
+    if (createsCycle) throw new Error(`Placing ${child.slug} under ${parent.slug} would create a question cycle.`);
+    const position = nextPosition(db, "question_parents", "parent_id", parent.id);
+    db.query("INSERT INTO question_parents (child_id, parent_id, position) VALUES (?, ?, ?)")
+      .run(child.id, parent.id, position);
+    appendEdit(db, input.actor, "place", "placement", child.id, {
+      child: child.slug, parent: parent.slug, acceptance: "suggested",
+    });
+    return { childSlug: child.slug, parentSlug: parent.slug, position };
+  })();
+  const result = getOutline(db).placements.find(({ childSlug, parentSlug }) => (
+    childSlug === placement.childSlug && parentSlug === placement.parentSlug
+  ));
+  if (!result) throw new Error("Placement was not persisted.");
+  return result;
 }
 
 export function updateQuestion(db: Database, questionSlug: string, input: { slug?: string; title?: string; detail?: string; actor: string }): Question {
@@ -677,7 +707,9 @@ export function getOutline(db: Database): OutlineSnapshot {
     o.slug AS resolved_option_slug, q.created_at, q.updated_at FROM questions q
     LEFT JOIN options o ON o.id = q.resolved_option_id ORDER BY q.id`).all() as Record<string, unknown>[];
   const placementRows = db.query(`SELECT child.slug AS child_slug, parent.slug AS parent_slug,
-    qp.position, qp.acceptance FROM question_parents qp JOIN questions child ON child.id = qp.child_id
+    qp.position, qp.acceptance,
+    qp.rowid = (SELECT MIN(candidate.rowid) FROM question_parents candidate WHERE candidate.child_id = qp.child_id) AS canonical
+    FROM question_parents qp JOIN questions child ON child.id = qp.child_id
     LEFT JOIN questions parent ON parent.id = qp.parent_id ORDER BY qp.parent_id, qp.position, qp.child_id`).all() as Record<string, unknown>[];
   const optionRows = db.query(`SELECT q.slug AS question_slug, o.slug, o.title, o.detail, o.acceptance,
     o.position, o.created_at, o.updated_at FROM options o JOIN questions q ON q.id = o.question_id
@@ -704,7 +736,7 @@ export function getOutline(db: Database): OutlineSnapshot {
     questions: questionRows.map(mapQuestion),
     placements: placementRows.map((row) => ({
       childSlug: String(row.child_slug), parentSlug: row.parent_slug === null ? null : String(row.parent_slug),
-      position: Number(row.position), acceptance: row.acceptance as Acceptance,
+      position: Number(row.position), acceptance: row.acceptance as Acceptance, canonical: Boolean(row.canonical),
     })),
     options: optionRows.map(mapOption),
     criteria: criterionRows.map(mapCriterion),
@@ -725,6 +757,7 @@ export function renderOutline(db: Database, options: { depth?: number; around?: 
   for (const option of snapshot.options) optionsByQuestion.set(option.questionSlug, [...(optionsByQuestion.get(option.questionSlug) ?? []), option]);
   const children = new Map<string | null, Placement[]>();
   for (const placement of snapshot.placements) children.set(placement.parentSlug, [...(children.get(placement.parentSlug) ?? []), placement]);
+  const canonicalPlacements = new Map(snapshot.placements.filter(({ canonical }) => canonical).map((placement) => [placement.childSlug, placement]));
   const questionIds = options.ids
     ? new Map((db.query("SELECT slug, id FROM questions").all() as { slug: string; id: number }[]).map((row) => [row.slug, Number(row.id)]))
     : new Map<string, number>();
@@ -741,6 +774,13 @@ export function renderOutline(db: Database, options: { depth?: number; around?: 
     const question = questions.get(placement.childSlug);
     if (!question || ancestors.has(question.slug)) return;
     const debugQuestion = options.ids ? ` Q${questionIds.get(question.slug)}` : "";
+    const canonical = canonicalPlacements.get(question.slug);
+    if (!placement.canonical) {
+      const canonicalParent = canonical?.parentSlug ?? "top level";
+      const suggestion = question.acceptance === "suggested" || placement.acceptance === "suggested" ? " [suggested]" : "";
+      lines.push(`${"  ".repeat(level)}- ↳ ${question.slug}${debugQuestion} (also under ${canonicalParent})${suggestion}`);
+      return;
+    }
     const selected = question.resolvedOptionSlug === null ? "" : ` → ${question.resolvedOptionSlug}`;
     const suggestion = question.acceptance === "suggested" || placement.acceptance === "suggested" ? " [suggested]" : "";
     lines.push(`${"  ".repeat(level)}- ${resolutionGlyph(question.resolution)} ${question.slug}${debugQuestion}: ${question.title}${selected}${suggestion}`);
@@ -752,7 +792,7 @@ export function renderOutline(db: Database, options: { depth?: number; around?: 
     for (const child of children.get(question.slug) ?? []) render(child, level + 1, next);
   };
   if (around !== undefined) {
-    const placement = snapshot.placements.find(({ childSlug }) => childSlug === around);
+    const placement = canonicalPlacements.get(around);
     if (placement) render(placement, 0, new Set());
   } else {
     for (const placement of children.get(null) ?? []) render(placement, 0, new Set());

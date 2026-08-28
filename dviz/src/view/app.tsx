@@ -80,6 +80,29 @@ function QuestionCard({ question, placement, options, focus, onOpen }: {
   );
 }
 
+function TransclusionCard({ question, placement, canonicalParent, onOpen }: {
+  question: Question;
+  placement: Placement;
+  canonicalParent: string | null;
+  onOpen: (slug: string) => void;
+}) {
+  const suggested = question.acceptance === "suggested" || placement.acceptance === "suggested";
+  const location = canonicalParent ?? "top level";
+  return (
+    <button
+      className={`transclusion-card ${suggested ? "suggested" : "accepted"}`}
+      type="button"
+      onClick={() => onOpen(question.slug)}
+      aria-label={`Open transcluded decision ${question.title}, also under ${location}`}
+    >
+      <span className="transclusion-icon" aria-hidden="true">↳</span>
+      <span className="slug-chip question-slug">{question.slug}</span>
+      <span className="transclusion-marker">also under <strong>{location}</strong></span>
+      <span className="open-cue" aria-hidden="true">›</span>
+    </button>
+  );
+}
+
 function Outline({ snapshot, onOpen }: { snapshot: OutlineSnapshot; onOpen: (slug: string) => void }) {
   const questionsBySlug = useMemo(
     () => new Map(snapshot.questions.map((question) => [question.slug, question])),
@@ -103,6 +126,10 @@ function Outline({ snapshot, onOpen }: { snapshot: OutlineSnapshot; onOpen: (slu
     }
     return options;
   }, [snapshot.options]);
+  const canonicalByQuestion = useMemo(
+    () => new Map(snapshot.placements.filter(({ canonical }) => canonical).map((placement) => [placement.childSlug, placement])),
+    [snapshot.placements],
+  );
 
   const renderBranch = (parentSlug: string | null, ancestors = new Set<string>()) => {
     const placements = childrenByParent.get(parentSlug) ?? [];
@@ -110,6 +137,18 @@ function Outline({ snapshot, onOpen }: { snapshot: OutlineSnapshot; onOpen: (slu
       const childSlug = placement.childSlug;
       const question = questionsBySlug.get(childSlug);
       if (!question || ancestors.has(childSlug)) return null;
+      if (!placement.canonical) {
+        return (
+          <li key={`${parentSlug ?? "root"}-${childSlug}`}>
+            <TransclusionCard
+              question={question}
+              placement={placement}
+              canonicalParent={canonicalByQuestion.get(childSlug)?.parentSlug ?? null}
+              onOpen={onOpen}
+            />
+          </li>
+        );
+      }
       const nextAncestors = new Set(ancestors).add(childSlug);
       const children = renderBranch(childSlug, nextAncestors);
       return (

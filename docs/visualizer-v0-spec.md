@@ -166,6 +166,7 @@ dviz question reopen QSLUG
 dviz option add --question QSLUG <slug> "title" [--detail ...]
 dviz option update QSLUG/OSLUG [--slug NEW] [...]
 dviz criterion add <slug> [--desc ...]
+dviz place --question CHILD_QSLUG --parent PARENT_QSLUG
 dviz assess --option QSLUG/OSLUG --criterion CSLUG --polarity +|-|~|? [--note ...]
 dviz relate --question QSLUG --criterion CSLUG
 dviz accept <kind> <slug>           suggested → accepted (any entity or edge)

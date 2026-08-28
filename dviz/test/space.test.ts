@@ -7,6 +7,7 @@ import {
   acceptEntity,
   addCriterion,
   addOption,
+  addPlacement,
   addQuestion,
   getEdits,
   getOutline,
@@ -115,12 +116,34 @@ describe("decision space", () => {
         { slug: "second-child" },
       ],
       placements: [
-        { childSlug: "parent", parentSlug: null, position: 1, acceptance: "suggested" },
-        { childSlug: "first-child", parentSlug: "parent", position: 1, acceptance: "suggested" },
-        { childSlug: "second-child", parentSlug: "parent", position: 2, acceptance: "suggested" },
+        { childSlug: "parent", parentSlug: null, position: 1, acceptance: "suggested", canonical: true },
+        { childSlug: "first-child", parentSlug: "parent", position: 1, acceptance: "suggested", canonical: true },
+        { childSlug: "second-child", parentSlug: "parent", position: 2, acceptance: "suggested", canonical: true },
       ],
     });
     expect(getEdits(db)[0]!.payload).toMatchObject({ slug: "parent", parent: "root" });
+    db.close();
+  });
+
+  test("adds acyclic transclusions while preserving the first parent as canonical", () => {
+    const { db } = testSpace();
+    addQuestion(db, { slug: "product", title: "Choose the product", actor: "agent:test" });
+    addQuestion(db, { slug: "delivery", title: "Choose delivery", actor: "agent:test" });
+    addQuestion(db, { slug: "pricing", title: "Choose pricing", parentSlug: "product", actor: "agent:test" });
+    addQuestion(db, { slug: "billing", title: "Choose billing", parentSlug: "pricing", actor: "agent:test" });
+
+    expect(addPlacement(db, { childSlug: "pricing", parentSlug: "delivery", actor: "agent:test" }))
+      .toMatchObject({ childSlug: "pricing", parentSlug: "delivery", canonical: false, acceptance: "suggested" });
+    expect(getOutline(db).placements.filter(({ childSlug }) => childSlug === "pricing")).toEqual([
+      expect.objectContaining({ parentSlug: "product", canonical: true }),
+      expect.objectContaining({ parentSlug: "delivery", canonical: false }),
+    ]);
+    expect(renderOutline(db)).toContain("↳ pricing (also under product) [suggested]");
+    expect(renderOutline(db).match(/billing: Choose billing/g)).toHaveLength(1);
+    expect(() => addPlacement(db, { childSlug: "product", parentSlug: "billing", actor: "agent:test" }))
+      .toThrow("would create a question cycle");
+    expect(() => addPlacement(db, { childSlug: "pricing", parentSlug: "delivery", actor: "agent:test" }))
+      .toThrow("already placed under delivery");
     db.close();
   });
 

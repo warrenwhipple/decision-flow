@@ -32,6 +32,7 @@ Usage:
   dviz option add --question QSLUG SLUG "TITLE" [--detail TEXT]
   dviz option update QSLUG/OSLUG [--slug NEW] [--title TEXT] [--detail TEXT]
   dviz criterion add CSLUG [--desc TEXT]
+  dviz place --question CHILD_QSLUG --parent PARENT_QSLUG
   dviz assess --option QSLUG/OSLUG --criterion CSLUG --polarity +|-|~|? [--note TEXT]
   dviz relate --question QSLUG --criterion CSLUG
   dviz accept KIND SLUG
@@ -259,6 +260,15 @@ async function relate(args: string[]): Promise<void> {
   console.log(`Related suggested criterion ${criterionSlug} to question ${questionSlug}`);
 }
 
+async function place(args: string[]): Promise<void> {
+  const clientInfo = client(args);
+  const childSlug = requireOption(args, "--question");
+  const parentSlug = requireOption(args, "--parent");
+  assertNoExtraArgs(args);
+  await command(clientInfo, "place", { childSlug, parentSlug });
+  console.log(`Placed suggested question ${childSlug} under ${parentSlug}`);
+}
+
 function parseKind(value: string | undefined): EntityKind {
   if (!value || !(["question", "option", "criterion", "assessment", "relation", "placement"] as string[]).includes(value)) {
     throw new Error("kind must be question, option, criterion, assessment, relation, or placement.");
@@ -335,6 +345,7 @@ async function main(): Promise<void> {
   if (commandName === "question") return questionCommand(args);
   if (commandName === "option") return optionCommand(args);
   if (commandName === "criterion") return criterionCommand(args);
+  if (commandName === "place") return place(args);
   if (commandName === "assess") return assess(args);
   if (commandName === "relate") return relate(args);
   if (commandName === "accept") return mutateEntity("accept", args);

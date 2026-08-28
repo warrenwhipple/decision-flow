@@ -92,6 +92,8 @@ test("command and projection APIs cover the slug-first v0 CLI lifecycle", async 
   };
 
   await run("question.add", { slug: "route", title: "Choose a route" });
+  await run("question.add", { slug: "delivery", title: "Choose delivery" });
+  await run("place", { childSlug: "route", parentSlug: "delivery" });
   await run("question.update", { questionSlug: "route", slug: "travel-route" });
   await run("option.add", { questionSlug: "travel-route", slug: "north", title: "Northern route" });
   await run("option.update", { optionPath: "travel-route/north", slug: "northern" });
@@ -105,8 +107,15 @@ test("command and projection APIs cover the slug-first v0 CLI lifecycle", async 
 
   const outline = await (await fetch(`${server.url}/api/outline`)).json() as Record<string, unknown[]>;
   expect(outline).toMatchObject({
-    questions: [{ slug: "travel-route", resolution: "decided", resolvedOptionSlug: "northern", acceptance: "accepted" }],
-    placements: [{ childSlug: "travel-route", parentSlug: null, acceptance: "accepted" }],
+    questions: [
+      { slug: "travel-route", resolution: "decided", resolvedOptionSlug: "northern", acceptance: "accepted" },
+      { slug: "delivery", resolution: "open", acceptance: "suggested" },
+    ],
+    placements: [
+      { childSlug: "travel-route", parentSlug: null, acceptance: "accepted", canonical: true },
+      { childSlug: "delivery", parentSlug: null, canonical: true },
+      { childSlug: "travel-route", parentSlug: "delivery", canonical: false },
+    ],
     options: [{ questionSlug: "travel-route", slug: "northern", acceptance: "suggested" }],
     focus: { kind: "option", reference: "travel-route/northern" },
   });
@@ -148,6 +157,10 @@ test("the real CLI parses slug-first question, option, status, and projection co
 
   expect(await runCli(dbPath, server, "question", "add", "route", "Choose a route"))
     .toContain("Added suggested question route");
+  expect(await runCli(dbPath, server, "question", "add", "delivery", "Choose delivery"))
+    .toContain("Added suggested question delivery");
+  expect(await runCli(dbPath, server, "place", "--question", "route", "--parent", "delivery"))
+    .toContain("Placed suggested question route under delivery");
   expect(await runCli(dbPath, server, "option", "add", "--question", "route", "north", "Northern route"))
     .toContain("route/north");
   expect(await runCli(dbPath, server, "option", "update", "route/north", "--slug", "northern"))
