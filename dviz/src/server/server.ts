@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
-import { resolve } from "node:path";
+import index from "../view/index.html";
+import { dinnerFixture } from "../view/dinner-fixture.ts";
 import {
   acceptEntity,
   addCriterion,
@@ -35,6 +36,7 @@ export type StartServerOptions = {
   dbPath: string;
   port?: number;
   hostname?: string;
+  development?: boolean;
 };
 
 const textEncoder = new TextEncoder();
@@ -66,26 +68,8 @@ function sseEvent(event: string, data: unknown): Uint8Array {
   return textEncoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
-async function buildView(): Promise<string> {
-  const viewPath = resolve(import.meta.dir, "../view/app.tsx");
-  const result = await Bun.build({
-    entrypoints: [viewPath],
-    target: "browser",
-    format: "esm",
-    minify: false,
-  });
-  if (!result.success || result.outputs.length !== 1) {
-    const detail = result.logs.map((log) => log.message).join("\n");
-    throw new Error(`Could not build the outline view.\n${detail}`);
-  }
-  return result.outputs[0]!.text();
-}
-
 export async function startServer(options: StartServerOptions): Promise<DvizServer> {
   const db = openSpace(options.dbPath);
-  const appJavaScript = await buildView();
-  const html = await Bun.file(resolve(import.meta.dir, "../view/index.html")).text();
-  const css = await Bun.file(resolve(import.meta.dir, "../view/styles.css")).text();
   const clients = new Set<ReadableStreamDefaultController<Uint8Array>>();
 
   const sendToClients = (message: Uint8Array) => {
@@ -105,17 +89,13 @@ export async function startServer(options: StartServerOptions): Promise<DvizServ
   const server = Bun.serve({
     hostname: options.hostname ?? "127.0.0.1",
     port: options.port ?? DEFAULT_PORT,
+    routes: { "/": index },
+    development: options.development ? { hmr: true, console: true } : false,
     async fetch(request) {
       const url = new URL(request.url);
 
-      if (request.method === "GET" && url.pathname === "/") {
-        return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
-      }
-      if (request.method === "GET" && url.pathname === "/app.js") {
-        return new Response(appJavaScript, { headers: { "Content-Type": "text/javascript; charset=utf-8" } });
-      }
-      if (request.method === "GET" && url.pathname === "/styles.css") {
-        return new Response(css, { headers: { "Content-Type": "text/css; charset=utf-8" } });
+      if (request.method === "GET" && url.pathname === "/api/fixtures/dinner" && options.development) {
+        return json(dinnerFixture);
       }
       if (request.method === "GET" && url.pathname === "/api/outline") {
         return json(getOutline(db));

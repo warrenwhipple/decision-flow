@@ -33,14 +33,9 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
 ## Status at a glance
 
 - Parked for now: `decision-mode`, `deliberate`, and `to-decisions` skills
-- Focusing on visualizer, stepping through v0 spec "Build order"
-  - v0 spec is written in docs
-  - thin slice works
-  - full CLI, statuses, dotted rendering works
-  - spec and code updated to be slug first
-  - zoomed decisions and assessment chip work
-  - focus and follow mode work with demo flag in html window obj
-  - dviz skill added
+- Focusing on `dviz` visualizer
+  - v0 is coded according to spec
+  - `bun dev` works for quick ui iteration
 
 ## Possible future direction
 

@@ -23,7 +23,7 @@ function usage(): string {
 
 Usage:
   dviz init [--db PATH]
-  dviz serve [--db PATH] [--port PORT]
+  dviz serve [--db PATH] [--port PORT] [--dev]
   dviz question add SLUG "TITLE" [--parent QSLUG] [--detail TEXT]
   dviz question update QSLUG [--slug NEW] [--title TEXT] [--detail TEXT]
   dviz question lean QSLUG --option OSLUG
@@ -101,9 +101,10 @@ async function init(args: string[]): Promise<void> {
 async function serve(args: string[]): Promise<void> {
   const explicitDb = takeOption(args, "--db");
   const port = parsePositiveInteger(takeOption(args, "--port"), "--port") ?? DEFAULT_PORT;
+  const development = takeFlag(args, "--dev");
   assertNoExtraArgs(args);
   const dbPath = findDbPath(process.cwd(), explicitDb);
-  const server = await startServer({ dbPath, port });
+  const server = await startServer({ dbPath, port, development });
   const infoPath = serverInfoPath(dbPath);
   const info: ServerInfo = { pid: process.pid, url: server.url, port: server.port, dbPath };
   writeFileSync(infoPath, `${JSON.stringify(info, null, 2)}\n`, "utf8");
@@ -122,6 +123,7 @@ async function serve(args: string[]): Promise<void> {
   process.once("SIGTERM", () => { cleanup(); process.exit(0); });
   console.log(`Serving ${dbPath}`);
   console.log(`Outline: ${server.url}`);
+  if (development) console.log(`Dinner fixture: ${server.url}?fixture=dinner`);
 }
 
 function readServerInfo(dbPath: string): ServerInfo {

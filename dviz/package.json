@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dviz": "bun run src/cli/index.ts",
+    "dev": "bun run src/cli/index.ts serve --dev",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit"
   },

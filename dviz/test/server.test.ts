@@ -73,6 +73,47 @@ test("POST /api/questions persists a slug and broadcasts an ID-free outline SSE 
   await reader.cancel();
 });
 
+test("the HTML route bundles the view and dinner fixtures are dev-only", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "dviz-server-test-"));
+  temporaryDirectories.push(directory);
+  const dbPath = join(directory, "space.db");
+  initializeSpace(dbPath).close();
+
+  const productionServer = await startServer({ dbPath, port: await availablePort() });
+  servers.push(productionServer);
+  const htmlResponse = await fetch(productionServer.url);
+  expect(htmlResponse.headers.get("content-type")).toContain("text/html");
+  const html = await htmlResponse.text();
+  expect(html).toContain("Decision Flow");
+  expect(html).not.toContain("/app.js");
+  expect((await fetch(`${productionServer.url}/api/fixtures/dinner`)).status).toBe(404);
+  productionServer.stop(true);
+  servers.splice(servers.indexOf(productionServer), 1);
+
+  const developmentServer = await startServer({ dbPath, port: await availablePort(), development: true });
+  servers.push(developmentServer);
+  const response = await fetch(`${developmentServer.url}/api/fixtures/dinner`);
+  expect(response.status).toBe(200);
+  const fixture = await response.json() as {
+    questions: Array<{ slug: string; resolution: string; resolvedOptionSlug: string | null }>;
+    placements: Array<{ childSlug: string; parentSlug: string | null; canonical: boolean; acceptance: string }>;
+    assessments: Array<{ polarity: string }>;
+    focus: { kind: string; reference: string };
+  };
+  expect(fixture.questions.length).toBeGreaterThanOrEqual(12);
+  expect(new Set(fixture.questions.map(({ resolution }) => resolution))).toEqual(new Set(["open", "leaning", "decided"]));
+  expect(fixture.questions.find(({ slug }) => slug === "main-course")).toMatchObject({
+    resolution: "leaning",
+    resolvedOptionSlug: "braise",
+  });
+  expect(fixture.placements.filter(({ childSlug }) => childSlug === "wine")).toEqual([
+    expect.objectContaining({ parentSlug: "main-course", canonical: true }),
+    expect.objectContaining({ parentSlug: "drinks", canonical: false, acceptance: "suggested" }),
+  ]);
+  expect(new Set(fixture.assessments.map(({ polarity }) => polarity))).toEqual(new Set(["+", "-", "~", "?"]));
+  expect(fixture.focus).toEqual(expect.objectContaining({ kind: "question", reference: "main-course" }));
+});
+
 test("command and projection APIs cover the slug-first v0 CLI lifecycle", async () => {
   const directory = mkdtempSync(join(tmpdir(), "dviz-server-test-"));
   temporaryDirectories.push(directory);

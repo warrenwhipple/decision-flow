@@ -344,6 +344,10 @@ function questionFromUrl(): string | null {
   return new URL(window.location.href).searchParams.get("question");
 }
 
+function fixtureFromUrl(): string | null {
+  return new URL(window.location.href).searchParams.get("fixture");
+}
+
 function questionForFocus(snapshot: OutlineSnapshot, focus: Focus): string | null {
   if (focus.kind === "question") return null;
   if (focus.kind === "option") return focus.reference.split("/", 1)[0] ?? null;
@@ -388,6 +392,7 @@ function DemoControls({ snapshot, onFocus }: {
 
 function App() {
   const demo = window.__DVIZ_DEMO_SNAPSHOT__;
+  const fixture = fixtureFromUrl();
   const [snapshot, setSnapshot] = useState<OutlineSnapshot>(demo ?? emptySnapshot);
   const [connection, setConnection] = useState<Connection>(demo ? "demo" : "connecting");
   const [selectedQuestion, setSelectedQuestion] = useState<string | null>(questionFromUrl);
@@ -398,15 +403,43 @@ function App() {
 
   useEffect(() => {
     if (demo) return;
-    const events = new EventSource("/api/events");
-    events.onopen = () => setConnection("live");
-    events.onerror = () => setConnection("offline");
-    events.addEventListener("outline", (event) => {
-      setSnapshot(JSON.parse((event as MessageEvent<string>).data) as OutlineSnapshot);
-      setConnection("live");
-    });
-    return () => events.close();
-  }, [demo]);
+    let cancelled = false;
+    let events: EventSource | undefined;
+
+    const connect = () => {
+      if (cancelled) return;
+      events = new EventSource("/api/events");
+      events.onopen = () => setConnection("live");
+      events.onerror = () => setConnection("offline");
+      events.addEventListener("outline", (event) => {
+        setSnapshot(JSON.parse((event as MessageEvent<string>).data) as OutlineSnapshot);
+        setConnection("live");
+      });
+    };
+
+    if (fixture) {
+      fetch(`/api/fixtures/${encodeURIComponent(fixture)}`)
+        .then(async (response) => {
+          if (!response.ok) {
+            connect();
+            return;
+          }
+          const fixtureSnapshot = await response.json() as OutlineSnapshot;
+          if (cancelled) return;
+          window.__DVIZ_DEMO_SNAPSHOT__ = fixtureSnapshot;
+          setSnapshot(fixtureSnapshot);
+          setConnection("demo");
+        })
+        .catch(connect);
+    } else {
+      connect();
+    }
+
+    return () => {
+      cancelled = true;
+      events?.close();
+    };
+  }, [demo, fixture]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -494,7 +527,7 @@ function App() {
           {connection}
         </div>
       </header>
-      {demo && (
+      {connection === "demo" && (
         <DemoControls
           snapshot={snapshot}
           onFocus={(focus) => setSnapshot((current) => ({ ...current, focus }))}
