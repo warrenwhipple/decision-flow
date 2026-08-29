@@ -61,21 +61,23 @@ function QuestionCard({ question, placement, options, focus, onOpen }: {
           {resolutionGlyph[question.resolution]}
         </span>
         <span className="open-cue" aria-hidden="true">›</span>
+        {options.length > 0 && (
+          <span className="option-list" role="list" aria-label={`Options for ${question.title}`}>
+            {options.map((option) => (
+              <span
+                className={`slug-chip option-slug option-chip ${option.acceptance} ${option.slug === question.resolvedOptionSlug ? "selected" : ""} ${isFocused(focus, "option", `${question.slug}/${option.slug}`) ? "focus-target" : ""}`}
+                key={option.slug}
+                role="listitem"
+                title={option.title}
+                data-node-kind="option"
+                data-node-reference={`${question.slug}/${option.slug}`}
+              >
+                {option.slug}
+              </span>
+            ))}
+          </span>
+        )}
       </button>
-      {options.length > 0 && (
-        <ul className="option-list" aria-label={`Options for ${question.title}`}>
-          {options.map((option) => (
-            <li
-              className={`${option.acceptance} ${option.slug === question.resolvedOptionSlug ? "selected" : ""} ${isFocused(focus, "option", `${question.slug}/${option.slug}`) ? "focus-target" : ""}`}
-              key={option.slug}
-              data-node-kind="option"
-              data-node-reference={`${question.slug}/${option.slug}`}
-            >
-              <span className="slug-chip option-slug">{option.slug}</span>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

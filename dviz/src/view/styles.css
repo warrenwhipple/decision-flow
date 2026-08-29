@@ -88,6 +88,7 @@ ol {
   display: grid;
   grid-template-columns: minmax(7rem, auto) 1fr 24px 14px;
   align-items: center;
+  row-gap: 7px;
   width: 100%;
   min-height: 50px;
   padding: 9px 13px;
@@ -231,32 +232,31 @@ ol {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 6px 10px 0 34px;
-  padding: 0;
-  list-style: none;
+  grid-column: 2 / 4;
+  margin-top: 1px;
 }
 
-.option-list li {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 28px;
-  padding: 4px 8px;
-  border: 1px solid #c5c8bf;
-  border-radius: 6px;
-  color: #52594d;
-  background: rgba(255, 255, 252, 0.62);
-  font-size: 0.78rem;
+.option-chip {
+  padding: 5px 8px;
+  border: 1px solid #c9bda9;
+  border-radius: 999px;
 }
 
-.option-list li.suggested {
+.option-chip.suggested {
   border-style: dotted;
   border-width: 2px;
 }
 
-.option-list li.selected {
+.question-card.leaning .option-chip.selected {
+  border-color: #c79b5d;
+  color: #76511f;
+  background: #f0dfc4;
+}
+
+.question-card.decided .option-chip.selected {
+  border-color: #91aa8a;
   color: #344431;
-  background: rgba(218, 228, 210, 0.72);
+  background: #dae4d2;
 }
 
 .empty-state {
@@ -529,12 +529,12 @@ footer {
 .question-card.focus-target,
 .decision-header.focus-target,
 .option-card.focus-target,
-.option-list li.focus-target,
 .unplaced-focus.focus-target {
   border-color: #47704e;
   box-shadow: 0 0 0 3px rgba(71, 112, 78, 0.16), 0 7px 22px rgba(45, 52, 41, 0.1);
 }
 
+.option-chip.focus-target { box-shadow: 0 0 0 3px rgba(71, 112, 78, 0.2); }
 .criterion-slug.focus-target { box-shadow: 0 0 0 3px rgba(71, 112, 78, 0.2); }
 
 .unplaced-focus {
@@ -667,6 +667,7 @@ footer {
   .question-copy { grid-column: 1; }
   .question-card .resolution { grid-column: 2; grid-row: 1 / span 2; }
   .question-card .open-cue { grid-column: 3; grid-row: 1 / span 2; }
+  .question-card .option-list { grid-column: 1 / -1; }
   .option-cards { grid-template-columns: 1fr; }
   .criteria-context { display: block; }
   .criteria-list { justify-content: flex-start; margin-top: 11px; }
