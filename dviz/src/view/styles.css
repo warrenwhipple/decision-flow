@@ -413,8 +413,8 @@ footer {
 }
 
 .option-cards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
@@ -468,18 +468,31 @@ footer {
 }
 
 .assessment-row {
-  display: grid;
-  grid-template-columns: 25px auto minmax(0, 1fr);
-  align-items: center;
-  gap: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   min-height: 34px;
-  padding: 5px 7px;
+  padding: 8px;
   border: 1px solid transparent;
   border-radius: 7px;
   background: rgba(235, 235, 227, 0.58);
 }
 
 .assessment-row.suggested { border: 1px dotted #9ca297; }
+
+.assessment-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.assessment-heading .criterion-slug {
+  max-width: calc(100% - 31px);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
 
 .polarity {
   display: inline-flex;
@@ -668,10 +681,7 @@ footer {
   .question-card .resolution { grid-column: 2; grid-row: 1 / span 2; }
   .question-card .open-cue { grid-column: 3; grid-row: 1 / span 2; }
   .question-card .option-list { grid-column: 1 / -1; }
-  .option-cards { grid-template-columns: 1fr; }
   .criteria-context { display: block; }
   .criteria-list { justify-content: flex-start; margin-top: 11px; }
-  .assessment-row { grid-template-columns: 25px auto; }
-  .assessment-note { grid-column: 2; }
   .demo-controls { position: sticky; top: 8px; margin: -16px 0 18px; }
 }

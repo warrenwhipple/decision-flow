@@ -228,11 +228,13 @@ function AssessmentRow({ assessment, criterion }: { assessment: Assessment; crit
       : assessment.polarity === "~" ? "mixed" : "unclear";
   return (
     <li className={`assessment-row ${assessment.acceptance}`}>
-      <span className={`polarity polarity-${polarityClass}`}>
-        <span aria-hidden="true">{assessment.polarity}</span>
-        <span className="visually-hidden">{polarityLabel[assessment.polarity]}</span>
-      </span>
-      <CriterionChip criterion={criterion} acceptance={assessment.acceptance} />
+      <div className="assessment-heading">
+        <span className={`polarity polarity-${polarityClass}`}>
+          <span aria-hidden="true">{assessment.polarity}</span>
+          <span className="visually-hidden">{polarityLabel[assessment.polarity]}</span>
+        </span>
+        <CriterionChip criterion={criterion} acceptance={assessment.acceptance} />
+      </div>
       {assessment.note && <span className="assessment-note">{assessment.note}</span>}
     </li>
   );
