@@ -685,3 +685,36 @@ footer {
   .criteria-list { justify-content: flex-start; margin-top: 11px; }
   .demo-controls { position: sticky; top: 8px; margin: -16px 0 18px; }
 }
+
+/* The library is navigation only: selection never changes the agent's target. */
+.library-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; }
+.space-sidebar { position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto; padding: 28px 18px; background: #eaece1; border-right: 1px solid #d5dacd; }
+.library-brand { color: #35452e; font-weight: 700; text-decoration: none; }
+.sidebar-heading { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; }
+.sidebar-heading h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: #68705f; }
+.space-sidebar button { border: 1px solid #b8c3ae; background: #f7f8f2; color: #35452e; border-radius: 6px; padding: 7px 10px; cursor: pointer; }
+.space-sidebar button:disabled { opacity: 0.6; cursor: wait; }
+.space-sidebar nav { display: grid; gap: 5px; margin-top: 12px; }
+.space-sidebar nav a { display: grid; gap: 5px; padding: 12px; border-radius: 7px; color: #424b3b; text-decoration: none; overflow-wrap: anywhere; }
+.space-sidebar nav a:hover { background: #e0e5d6; }
+.space-sidebar nav a[aria-current] { background: #d4dfc7; color: #283e23; }
+.space-sidebar nav strong { font-size: 0.9rem; font-weight: 600; }
+.space-sidebar nav small, .space-target code { font-family: ui-monospace, monospace; }
+.space-sidebar nav small, .sidebar-hint, .space-target { font-size: 0.75rem; color: #68705f; }
+.space-target { margin-bottom: 0; overflow-wrap: anywhere; }
+.space-content { min-width: 0; }
+.new-space-form { display: grid; gap: 10px; margin: 12px 0 18px; }
+.new-space-form label { display: grid; gap: 4px; font-size: 0.8rem; }
+.new-space-form input { width: 100%; min-width: 0; border: 1px solid #b8c3ae; border-radius: 5px; padding: 8px; font: inherit; background: #fafbf7; }
+.new-space-form small { font-size: 0.7rem; color: #68705f; }
+.space-sidebar [role=alert] { color: #943e32; font-size: 0.8rem; }
+.space-sidebar :focus-visible { outline: 2px solid #587d53; outline-offset: 2px; }
+@media (max-width: 640px) {
+  .library-layout { grid-template-columns: 150px minmax(0, 1fr); }
+  .space-sidebar { padding: 20px 10px; }
+  .sidebar-heading { align-items: start; gap: 6px; flex-direction: column; }
+  .space-content main, .space-content main.zoomed { width: calc(100% - 24px); padding-top: 28px; }
+  .space-content header { flex-wrap: wrap; }
+  .space-content h1 { font-size: 2rem; overflow-wrap: anywhere; }
+  .space-content code { overflow-wrap: anywhere; }
+}

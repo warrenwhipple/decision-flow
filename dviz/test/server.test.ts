@@ -50,6 +50,10 @@ test("POST /api/questions persists a slug and broadcasts an ID-free outline SSE 
   const server = await startServer({ dbPath, port: await availablePort() });
   servers.push(server);
 
+  expect(await (await fetch(`${server.url}/api/spaces`)).json()).toEqual({ mode: "legacy", spaces: [] });
+  expect((await fetch(`${server.url}/api/spaces`, { method: "POST" })).status).toBe(400);
+  expect((await fetch(`${server.url}/api/outline?space=wrong-server`)).status).toBe(400);
+
   const eventsResponse = await fetch(`${server.url}/api/events`);
   const reader = eventsResponse.body!.getReader();
   const decoder = new TextDecoder();

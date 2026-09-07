@@ -39,6 +39,7 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
 - Focusing on `dviz` visualizer
   - v0 is coded according to spec
   - `bun dev` works for quick ui iteration
+  - `dviz` refactored to run outside repos with sidebar library of spaces
 
 ## Possible future direction
 

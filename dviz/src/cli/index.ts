@@ -4,25 +4,30 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import {
   dbOverride,
   DEFAULT_PORT,
-  defaultDbPath,
-  ensureGitignored,
   findDbPath,
   initializeSpace,
   resolvePath,
   serverInfoPath,
+  validateSlug,
   type EntityKind,
   type NodeKind,
 } from "../db/space.ts";
+import { join } from "node:path";
+import { libraryPath, type SpaceSummary } from "../db/library.ts";
 import { startServer } from "../server/server.ts";
 
-type ServerInfo = { pid: number; url: string; port: number; dbPath: string };
-type Client = { baseUrl: string; actor: string };
+type ServerInfo = { pid: number; url: string; port: number; dbPath?: string };
+type Client = { baseUrl: string; actor: string; space?: string };
 
 function usage(): string {
   return `dviz — decision visualizer
 
 Usage:
-  dviz init [--db PATH]
+  dviz space list
+  dviz space create SLUG "TITLE"
+  dviz space open SLUG               print a browser link (does not retarget agents)
+  dviz init SLUG "TITLE"              alias for space create
+  dviz init --db PATH                 initialize a legacy standalone database
   dviz serve [--db PATH] [--port PORT] [--dev]
   dviz question add SLUG "TITLE" [--parent QSLUG] [--detail TEXT]
   dviz question update QSLUG [--slug NEW] [--title TEXT] [--detail TEXT]
@@ -42,7 +47,11 @@ Usage:
   dviz show KIND SLUG
   dviz log [--since EDIT_ID|TIMESTAMP]
 
-All server-backed commands also accept --db PATH and --url URL.
+Graph commands require --space SLUG or DVIZ_SPACE for the home library.
+Library location: ~/.dviz/ (override with DVIZ_HOME). Run dviz serve first.
+All server-backed commands accept --url URL (or DVIZ_URL).
+Explicit --db PATH (or DVIZ_DB) uses a legacy standalone server instead.
+--space and --db cannot be combined; there is no shared active space.
 Option references outside a named question use QSLUG/OSLUG.
 Edge references: assessment QSLUG/OSLUG:CSLUG, relation QSLUG:CSLUG,
 placement CHILD_QSLUG:PARENT_QSLUG (use CHILD_QSLUG:root at the root).
@@ -89,13 +98,13 @@ function assertNoExtraArgs(args: string[]): void {
 
 async function init(args: string[]): Promise<void> {
   const explicitDb = takeOption(args, "--db");
+  const override = dbOverride(explicitDb);
+  if (!override) return spaceCommand(["create", ...args]);
   assertNoExtraArgs(args);
-  const path = explicitDb || process.env.DVIZ_DB ? resolvePath(dbOverride(explicitDb)!) : defaultDbPath();
+  const path = resolvePath(override);
   if (existsSync(path)) throw new Error(`A decision space already exists at ${path}.`);
   initializeSpace(path).close();
-  const gitignored = !explicitDb && !process.env.DVIZ_DB ? ensureGitignored(process.cwd()) : false;
   console.log(`Initialized decision space at ${path}`);
-  if (gitignored) console.log("Added .dviz/ to .gitignore");
 }
 
 async function serve(args: string[]): Promise<void> {
@@ -103,9 +112,17 @@ async function serve(args: string[]): Promise<void> {
   const port = parsePositiveInteger(takeOption(args, "--port"), "--port") ?? DEFAULT_PORT;
   const development = takeFlag(args, "--dev");
   assertNoExtraArgs(args);
-  const dbPath = findDbPath(process.cwd(), explicitDb);
-  const server = await startServer({ dbPath, port, development });
-  const infoPath = serverInfoPath(dbPath);
+  const dbPath = dbOverride(explicitDb) ? findDbPath(process.cwd(), explicitDb) : undefined;
+  const directory = libraryPath();
+  const infoPath = dbPath ? serverInfoPath(dbPath) : join(directory, "server.json");
+  // Do not start a second writer against the same registered library/database.
+  if (existsSync(infoPath)) {
+    const registered = JSON.parse(readFileSync(infoPath, "utf8")) as ServerInfo;
+    let running = false;
+    try { process.kill(registered.pid, 0); running = true; } catch { /* stale registration */ }
+    if (running) throw new Error(`A server is already registered at ${registered.url}. Stop it before restarting.`);
+  }
+  const server = await startServer({ dbPath, libraryDir: dbPath ? undefined : directory, port, development });
   const info: ServerInfo = { pid: process.pid, url: server.url, port: server.port, dbPath };
   writeFileSync(infoPath, `${JSON.stringify(info, null, 2)}\n`, "utf8");
   const cleanup = () => {
@@ -121,7 +138,7 @@ async function serve(args: string[]): Promise<void> {
   };
   process.once("SIGINT", () => { cleanup(); process.exit(0); });
   process.once("SIGTERM", () => { cleanup(); process.exit(0); });
-  console.log(`Serving ${dbPath}`);
+  console.log(`Serving ${dbPath ?? `space library at ${directory}`}`);
   console.log(`Outline: ${server.url}`);
   if (development) console.log(`Dinner fixture: ${server.url}?fixture=dinner`);
 }
@@ -136,17 +153,69 @@ function readServerInfo(dbPath: string): ServerInfo {
   }
 }
 
+function libraryClient(args: string[]): Client {
+  const urlOverride = takeOption(args, "--url") ?? (process.env.DVIZ_URL?.trim() || undefined);
+  const infoPath = join(libraryPath(), "server.json");
+  if (!urlOverride && !existsSync(infoPath)) throw new Error("No library server is registered. Run `dviz serve` first.");
+  return {
+    baseUrl: urlOverride ?? (JSON.parse(readFileSync(infoPath, "utf8")) as ServerInfo).url,
+    actor: process.env.DVIZ_ACTOR?.trim() || "agent:cli",
+  };
+}
+
 function client(args: string[]): Client {
   const explicitDb = takeOption(args, "--db");
-  const urlOverride = takeOption(args, "--url") ?? process.env.DVIZ_URL;
-  const dbPath = findDbPath(process.cwd(), explicitDb);
-  return { baseUrl: urlOverride ?? readServerInfo(dbPath).url, actor: process.env.DVIZ_ACTOR?.trim() || "agent:cli" };
+  const explicitSpace = takeOption(args, "--space");
+  const space = explicitSpace ?? process.env.DVIZ_SPACE;
+  if (dbOverride(explicitDb)) {
+    if (space) throw new Error("Cannot combine --space / DVIZ_SPACE with --db / DVIZ_DB.");
+    const urlOverride = takeOption(args, "--url") ?? (process.env.DVIZ_URL?.trim() || undefined);
+    const dbPath = findDbPath(process.cwd(), explicitDb);
+    return { baseUrl: urlOverride ?? readServerInfo(dbPath).url, actor: process.env.DVIZ_ACTOR?.trim() || "agent:cli" };
+  }
+  if (!space) throw new Error("Choose a space with --space SLUG or DVIZ_SPACE. Use `dviz space list`; browser selection never targets CLI edits.");
+  validateSlug(space, "Space slug");
+  return { ...libraryClient(args), space };
+}
+
+async function spaceCommand(args: string[]): Promise<void> {
+  const verb = args.shift();
+  const connection = libraryClient(args);
+  if (verb === "list") {
+    assertNoExtraArgs(args);
+    const response = await request(connection, "/api/spaces");
+    const body = await response.json() as { mode: string; spaces: SpaceSummary[] };
+    if (body.mode !== "library") throw new Error("This is a legacy server. Start the home library with `dviz serve`.");
+    console.log(body.spaces.map(({ slug, title }) => `${slug} — ${title}`).join("\n") || 'No spaces yet. Use dviz space create SLUG "TITLE".');
+    return;
+  }
+  const slug = validateSlug(requireArgument(args.shift(), "space slug"), "Space slug");
+  if (verb === "create") {
+    const title = requireArgument(args.shift(), "space title");
+    assertNoExtraArgs(args);
+    await request(connection, "/api/spaces", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, title }),
+    });
+    console.log(`Created space ${slug}: ${title}`);
+  } else if (verb === "open") {
+    assertNoExtraArgs(args);
+    // Validate the target without changing any shared selection.
+    await request({ ...connection, space: slug }, "/api/outline");
+  } else {
+    throw new Error("Space command must be list, create, or open.");
+  }
+  const url = new URL("/", connection.baseUrl);
+  url.searchParams.set("space", slug);
+  console.log(`Open: ${url}`);
+  console.log(`Agent target: --space ${slug}`);
 }
 
 async function request(clientInfo: Client, path: string, init?: RequestInit): Promise<Response> {
   let response: Response;
   try {
-    response = await fetch(new URL(path, clientInfo.baseUrl), init);
+    const url = new URL(path, clientInfo.baseUrl);
+    if (clientInfo.space) url.searchParams.set("space", clientInfo.space);
+    response = await fetch(url, init);
   } catch {
     throw new Error(`Could not reach the dviz server at ${clientInfo.baseUrl}. Run \`dviz serve\` and try again.`);
   }
@@ -342,6 +411,7 @@ async function main(): Promise<void> {
     console.log(usage());
     return;
   }
+  if (commandName === "space") return spaceCommand(args);
   if (commandName === "init") return init(args);
   if (commandName === "serve") return serve(args);
   if (commandName === "question") return questionCommand(args);

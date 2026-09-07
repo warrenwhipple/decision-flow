@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { SpaceSummary } from "../db/library.ts";
 import { createRoot } from "react-dom/client";
 import type {
   Acceptance,
@@ -105,7 +106,7 @@ function TransclusionCard({ question, placement, canonicalParent, onOpen }: {
   );
 }
 
-function Outline({ snapshot, onOpen }: { snapshot: OutlineSnapshot; onOpen: (slug: string) => void }) {
+function Outline({ snapshot, onOpen, space }: { snapshot: OutlineSnapshot; onOpen: (slug: string) => void; space?: string }) {
   const questionsBySlug = useMemo(
     () => new Map(snapshot.questions.map((question) => [question.slug, question])),
     [snapshot.questions],
@@ -190,7 +191,7 @@ function Outline({ snapshot, onOpen }: { snapshot: OutlineSnapshot; onOpen: (slu
         {unplacedFocus}
         <div className="empty-state">
           <p>No questions yet.</p>
-          <code>dviz question add next-step "What should we decide?"</code>
+          <code>dviz question add next-step "What should we decide?"{space ? ` --space ${space}` : ""}</code>
         </div>
       </>
     );
@@ -392,7 +393,7 @@ function DemoControls({ snapshot, onFocus }: {
   );
 }
 
-function App() {
+function App({ space, title }: { space?: string; title?: string }) {
   const demo = window.__DVIZ_DEMO_SNAPSHOT__;
   const fixture = fixtureFromUrl();
   const [snapshot, setSnapshot] = useState<OutlineSnapshot>(demo ?? emptySnapshot);
@@ -410,7 +411,7 @@ function App() {
 
     const connect = () => {
       if (cancelled) return;
-      events = new EventSource("/api/events");
+      events = new EventSource(`/api/events${space ? `?${new URLSearchParams({ space })}` : ""}`);
       events.onopen = () => setConnection("live");
       events.onerror = () => setConnection("offline");
       events.addEventListener("outline", (event) => {
@@ -441,7 +442,7 @@ function App() {
       cancelled = true;
       events?.close();
     };
-  }, [demo, fixture]);
+  }, [demo, fixture, space]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -522,7 +523,8 @@ function App() {
       <header>
         <div>
           <p className="eyebrow">Decision Flow</p>
-          <h1>{zoomed ? "Decision" : "Live outline"}</h1>
+          <h1>{title ?? (zoomed ? "Decision" : "Live outline")}</h1>
+          {space && <p className="space-target">Agent target: <code>--space {space}</code></p>}
         </div>
         <div className={`connection ${connection}`}>
           <span aria-hidden="true" />
@@ -544,7 +546,7 @@ function App() {
         </section>
       ) : (
         <section aria-live="polite">
-          <Outline snapshot={snapshot} onOpen={(slug) => navigate(slug)} />
+          <Outline snapshot={snapshot} onOpen={(slug) => navigate(slug)} space={space} />
         </section>
       )}
       {snapshot.focus && (
@@ -566,6 +568,99 @@ function App() {
   );
 }
 
+function LibraryApp() {
+  const [spaces, setSpaces] = useState<SpaceSummary[]>([]);
+  const [mode, setMode] = useState<"loading" | "library" | "legacy">("loading");
+  const [error, setError] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugEdited, setSlugEdited] = useState(false);
+  const selected = new URL(window.location.href).searchParams.get("space");
+  const demo = Boolean(window.__DVIZ_DEMO_SNAPSHOT__ || fixtureFromUrl());
+
+  useEffect(() => {
+    if (demo) return;
+    let cancelled = false;
+    const controller = new AbortController();
+    const refresh = async () => {
+      try {
+        const response = await fetch("/api/spaces", { signal: controller.signal });
+        if (!response.ok) throw new Error("Could not load spaces. Check that dviz serve is running.");
+        const body = await response.json() as { mode: "library" | "legacy"; spaces: SpaceSummary[] };
+        if (!cancelled) { setSpaces(body.spaces); setMode(body.mode); setError(""); }
+      } catch (error) {
+        if (!cancelled) setError(error instanceof Error ? error.message : String(error));
+      }
+    };
+    void refresh();
+    const interval = setInterval(refresh, 3_000);
+    return () => { cancelled = true; controller.abort(); clearInterval(interval); };
+  }, [demo]);
+
+  const [createError, setCreateError] = useState("");
+  const createSpace = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    setCreateError("");
+    try {
+      const response = await fetch("/api/spaces", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, title }),
+      });
+      const body = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(body.error ?? "Could not create space.");
+      window.location.assign(`/?${new URLSearchParams({ space: slug })}`);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : String(error));
+      setSaving(false);
+    }
+  };
+
+  if (demo || mode === "legacy") return <App />;
+  const current = spaces.find(({ slug }) => slug === selected);
+  return (
+    <div className="library-layout">
+      <aside className="space-sidebar" aria-label="Decision spaces">
+        <a className="library-brand" href="/">Decision Flow</a>
+        <div className="sidebar-heading"><h2>Spaces</h2><button type="button" onClick={() => setCreating(!creating)} aria-expanded={creating}>+ New</button></div>
+        {creating && (
+          <form className="new-space-form" onSubmit={createSpace}>
+            <label>Title<input autoFocus required maxLength={200} value={title} onChange={(event) => {
+              const value = event.target.value;
+              setTitle(value);
+              if (!slugEdited) setSlug(value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^[^a-z]+/, "").replace(/-$/, "").slice(0, 64).replace(/-$/, ""));
+            }} /></label>
+            <label>Space slug<input required maxLength={64} pattern="[a-z][a-z0-9]*(-[a-z0-9]+)*" value={slug} onChange={(event) => { setSlugEdited(true); setSlug(event.target.value); }} /></label>
+            <small>A unique handle for agent commands.</small>
+            {createError && <p role="alert">{createError}</p>}
+            <button disabled={saving} type="submit">{saving ? "Creating…" : "Create space"}</button>
+          </form>
+        )}
+        {error && <p role="alert">{error}</p>}
+        <nav aria-label="Spaces">
+          {spaces.map((space) => (
+            <a key={space.slug} href={`/?${new URLSearchParams({ space: space.slug })}`} aria-current={selected === space.slug ? "page" : undefined}>
+              <strong>{space.title}</strong><small>{space.slug}</small>
+            </a>
+          ))}
+        </nav>
+        {mode === "library" && spaces.length === 0 && <p className="sidebar-hint">Your decision maps live here, independent of repositories.</p>}
+      </aside>
+      <div className="space-content">
+        {current ? <App key={current.slug} space={current.slug} title={current.title} /> : (
+          <main>
+            <p className="eyebrow">Personal decision library</p>
+            <h1>{mode === "loading" ? "Loading spaces…" : selected ? "Space not found" : "Your decision spaces"}</h1>
+            <p>{selected && mode !== "loading" ? `No space named “${selected}” is in this library.` : "Choose a space from the sidebar, or create one to start a decision map."}</p>
+            <p>Browsing spaces does not change where an agent is working.</p>
+          </main>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing #root element.");
-createRoot(root).render(<App />);
+createRoot(root).render(<LibraryApp />);

@@ -6,7 +6,15 @@ disable-model-invocation: true
 
 # dviz
 
-I have a decision space served by `dviz serve` and its outline view open beside our conversation. Everything you capture through the `dviz` CLI appears there live. Run `dviz --help` for the full command surface. State lives behind the server — never read or edit `.dviz/` files; re-read with `dviz outline` (compact projection) and `dviz show KIND SLUG`.
+I have a personal library served by `dviz serve` and its view open beside our conversation. Everything you capture through the `dviz` CLI appears live in its target space. Run `dviz --help` for the full command surface. State lives behind the server — never read or edit `.dviz/` files (including `~/.dviz/`); re-read with `dviz outline --space SLUG` and `dviz show KIND SLUG --space SPACE`.
+
+## Bind this conversation to a space
+
+Use `dviz space list` to discover maps. Establish which named space this conversation is working in; ask if the intended target is ambiguous. Pass `--space SPACE` on every graph command. A conversation-local `DVIZ_SPACE` is also supported, but do not set a global shared active space or change shell startup files. Browsing another map does not change our target: keep writing to this conversation's space unless I ask to switch.
+
+When asked to create a map, use `dviz space create SPACE "Title"`; `dviz space open SPACE` prints its browser link. Share that link so I can open it. Space slugs follow the same format as node slugs and must be unique across the library. Space titles are readable labels. The sidebar's selected map is not an agent-routing signal.
+
+Existing repo-local maps can still be targeted with explicit `--db PATH` instead of `--space`; never combine the two modes or migrate saved maps without asking.
 
 ## Suggest, never settle
 
@@ -25,7 +33,7 @@ Refer to an option outside its question as `question-slug/option-slug`.
 
 ## Keep focus with the conversation
 
-When discussion moves to a node, point focus at it — `dviz focus question capture-friction` — and the view carries me there. Update focus as we move; don't leave it stranded on an old topic.
+When discussion moves to a node, point focus at it — `dviz focus question capture-friction --space SPACE` — and the view carries me there. Update focus as we move; don't leave it stranded on an old topic.
 
 ## Assessments
 

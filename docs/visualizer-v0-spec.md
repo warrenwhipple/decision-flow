@@ -1,5 +1,7 @@
 # Visualizer v0 Spec (draft)
 
+> **2026-09-07 implementation update:** The original repo-local, one-process-per-space default below is superseded by the personal library. `dviz serve` now serves all home-directory spaces from one process; the sidebar supports creation and navigation. Graph commands explicitly target `--space SLUG` / `DVIZ_SPACE`, independent of browser selection. Existing databases remain available via `--db`, with no automatic migration. See [README](../README.md#dviz) for current commands and storage. The original v0 design is retained below for context.
+
 AI-compiled draft (Claude, 2026-08-24) carpentered from Warren's deliberation session. Warren owns final decisions; mark up freely. Every decision below was stated or accepted by Warren on 2026-08-24 (slug/handle decisions: 2026-08-25) unless marked **(proposed)**.
 
 ## Purpose

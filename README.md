@@ -24,17 +24,39 @@ Start here:
 
 ## dviz
 
-`dviz` is a local decision visualizer. You run `dviz serve` in a project and keep the outline view open beside your agent conversation; the agent captures questions, options, criteria, and assessments through the `dviz` CLI, and each one appears live. Agent-created nodes land as *suggested* (rendered dotted) until you accept them, and accepting, leaning, deciding, and removing stay human verbs. Slugs are the shared handle between you, the agent, and the view.
+`dviz` is a local decision visualizer with a personal library of spaces. Each space is one decision map, independent of any repository. Run one `dviz serve` process from anywhere, keep the view beside your conversation, and use the persistent sidebar to create and browse spaces. Agents capture questions, options, criteria, and assessments through the CLI; each appears live as *suggested* until you accept it.
 
-State is a repo-local, gitignored `.dviz/space.db` behind the server. The `dviz` skill teaches the agent the CLI, the suggest-never-settle rule, and slug-minting heuristics.
+New spaces live in `~/.dviz/spaces/<slug>/space.db`, with titles and slugs tracked in `~/.dviz/library.db`. Set `DVIZ_HOME` to use another library directory. Agents access state through the CLI, never database files.
 
 ```sh
 cd dviz && bun install && bun link   # global `dviz` binary
-cd ../some-project
-dviz init                            # creates .dviz/ and gitignores it
-dviz serve                           # starts the server and view
-dviz --help                          # full command surface
+dviz serve                          # one server for the entire personal library
+# Open the printed Outline URL; use + New to create a space.
+# In another terminal (from any directory):
+dviz space create travel "Travel plans"
+dviz space list
+dviz space open travel               # prints a link; does not switch agent targets
+dviz question add destination "Where should we go?" --space travel
+dviz outline --space travel
+dviz --help
 ```
+
+Every graph command needs `--space SLUG` or a conversation-local `DVIZ_SPACE` environment variable. An explicit flag overrides that variable. **Browsing another space never redirects agent edits.** Space links include `?space=SLUG`, so separate tabs and browser history work independently. Space titles may repeat; slugs must be unique lowercase handles. The sidebar updates when spaces are created through the CLI.
+
+`dviz init SLUG "TITLE"` is an alias for `space create`; both require the server to be running. There is no shared active space, automatic repo discovery in the default CLI workflow, or automatic data migration. Folders, tags, renaming spaces, and deletion are not part of this iteration.
+
+### Existing repo-local databases
+
+Existing maps are left in place. Use the explicit compatibility mode to keep working with them (use a different port if the library server is also running):
+
+```sh
+dviz serve --db /path/to/project/.dviz/space.db --port 4318
+dviz outline --db /path/to/project/.dviz/space.db
+```
+
+`DVIZ_DB` is still supported for this mode; do not combine it with `--space` or `DVIZ_SPACE`. `dviz init --db PATH` still creates a standalone database. Existing maps are not listed in the personal library and are not moved, copied, or deleted automatically. Stop an older server before starting its replacement.
+
+For development, `cd dviz && bun run dev` serves the library with live UI updates and the `?fixture=dinner` demo. Run `bun test` and `bun run typecheck` in `dviz/`.
 
 ## Decision Mode
 

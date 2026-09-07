@@ -22,11 +22,12 @@ This repo is `decision-flow`, Warren's prototype QOC/IBIS based decision ontolog
 
 ## `dviz` visualizer and skill
 
-`dviz` is the current focus. Warren runs `dviz serve` in a dogfood repo and keeps
+`dviz` is the current focus. Warren runs `dviz serve` from any directory and keeps
 the outline view open beside the conversation; the agent captures questions,
 options, criteria, and assessments through the `dviz` CLI and they render live.
 
-- State lives in a repo-local `.dviz/space.db` (gitignored) behind the server. Agents go through the CLI only; never read or edit `.dviz/` directly.
+- Spaces live in the personal `~/.dviz/` library (`DVIZ_HOME` overrides the directory). One server serves all maps; the UI sidebar selects only what Warren views. Agents must target each graph command with `--space SLUG` or conversation-local `DVIZ_SPACE`; browser navigation never retargets edits.
+- Agents go through the CLI only; never read or edit `.dviz/` directly. `dviz space list/create/open` manage discovery and creation. Existing repo-local databases remain accessible only through explicit `--db` / `DVIZ_DB` compatibility mode; do not automatically migrate them.
 - Everything an agent creates lands as `suggested` (dotted in the view). `accept`, `lean`, `decide`, `reopen`, and `remove` are Warren's verbs — only issue them when asked.
 - Slugs are the shared handle across CLI, speech, and view. Slug-minting heuristics live in the skill, not the CLI or schema.
 - `dviz --help` is the authoritative command surface; `docs/visualizer-v0-spec.md` holds the design and build order.
