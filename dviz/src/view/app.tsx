@@ -393,6 +393,63 @@ function DemoControls({ snapshot, onFocus }: {
   );
 }
 
+type Theme = "system" | "light" | "dark";
+
+function ThemeToggle() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    try {
+      const stored = localStorage.getItem("dviz.theme");
+      return stored === "light" || stored === "dark" ? stored : "system";
+    } catch { return "system"; }
+  });
+
+  useEffect(() => {
+    if (theme === "system") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = theme;
+    try {
+      if (theme === "system") localStorage.removeItem("dviz.theme");
+      else localStorage.setItem("dviz.theme", theme);
+    } catch { /* Theme switching still works when storage is unavailable. */ }
+  }, [theme]);
+
+  const choices = [
+    { value: "system", label: "System", glyph: "◐" },
+    { value: "light", label: "Light", glyph: "☼" },
+    { value: "dark", label: "Dark", glyph: "☾" },
+  ] as const;
+
+  return (
+    <div className="theme-toggle" role="radiogroup" aria-label="Theme">
+      {choices.map(({ value, label, glyph }, index) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={theme === value}
+          tabIndex={theme === value ? 0 : -1}
+          title={label}
+          onClick={() => setTheme(value)}
+          onKeyDown={(event) => {
+            let next = index;
+            if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (index + 1) % choices.length;
+            else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index + choices.length - 1) % choices.length;
+            else if (event.key === "Home") next = 0;
+            else if (event.key === "End") next = choices.length - 1;
+            else return;
+            event.preventDefault();
+            event.stopPropagation();
+            setTheme(choices[next]!.value);
+            (event.currentTarget.parentElement?.children[next] as HTMLButtonElement | undefined)?.focus();
+          }}
+        >
+          <span aria-hidden="true">{glyph}</span>
+          <span className="visually-hidden">{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function App({ space, title }: { space?: string; title?: string }) {
   const demo = window.__DVIZ_DEMO_SNAPSHOT__;
   const fixture = fixtureFromUrl();
@@ -526,9 +583,12 @@ function App({ space, title }: { space?: string; title?: string }) {
           <h1>{title ?? (zoomed ? "Decision" : "Live outline")}</h1>
           {space && <p className="space-target">Agent target: <code>--space {space}</code></p>}
         </div>
-        <div className={`connection ${connection}`}>
-          <span aria-hidden="true" />
-          {connection}
+        <div className="header-tools">
+          <div className={`connection ${connection}`}>
+            <span aria-hidden="true" />
+            {connection}
+          </div>
+          {!space && <ThemeToggle />}
         </div>
       </header>
       {connection === "demo" && (
@@ -569,6 +629,14 @@ function App({ space, title }: { space?: string; title?: string }) {
 }
 
 function LibraryApp() {
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem("dviz.sidebar") === "collapsed"; }
+    catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("dviz.sidebar", collapsed ? "collapsed" : "expanded"); }
+    catch { /* The sidebar remains usable without persistence. */ }
+  }, [collapsed]);
   const [spaces, setSpaces] = useState<SpaceSummary[]>([]);
   const [mode, setMode] = useState<"loading" | "library" | "legacy">("loading");
   const [error, setError] = useState("");
@@ -620,9 +688,21 @@ function LibraryApp() {
   if (demo || mode === "legacy") return <App />;
   const current = spaces.find(({ slug }) => slug === selected);
   return (
-    <div className="library-layout">
+    <div className={`library-layout${collapsed ? " sidebar-collapsed" : ""}`}>
       <aside className="space-sidebar" aria-label="Decision spaces">
-        <a className="library-brand" href="/">Decision Flow</a>
+        <div className="sidebar-top">
+          <a className="library-brand" href="/">Decision Flow</a>
+          <button
+            className="sidebar-toggle"
+            type="button"
+            aria-expanded={!collapsed}
+            aria-controls="space-list"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            {collapsed ? "»" : "«"}
+          </button>
+        </div>
         <div className="sidebar-heading"><h2>Spaces</h2><button type="button" onClick={() => setCreating(!creating)} aria-expanded={creating}>+ New</button></div>
         {creating && (
           <form className="new-space-form" onSubmit={createSpace}>
@@ -638,14 +718,16 @@ function LibraryApp() {
           </form>
         )}
         {error && <p role="alert">{error}</p>}
-        <nav aria-label="Spaces">
+        <nav id="space-list" aria-label="Spaces">
           {spaces.map((space) => (
-            <a key={space.slug} href={`/?${new URLSearchParams({ space: space.slug })}`} aria-current={selected === space.slug ? "page" : undefined}>
+            <a key={space.slug} title={space.title} aria-label={space.title} href={`/?${new URLSearchParams({ space: space.slug })}`} aria-current={selected === space.slug ? "page" : undefined}>
+              <span className="space-initial" aria-hidden="true">{Array.from(space.title)[0]}</span>
               <strong>{space.title}</strong><small>{space.slug}</small>
             </a>
           ))}
         </nav>
         {mode === "library" && spaces.length === 0 && <p className="sidebar-hint">Your decision maps live here, independent of repositories.</p>}
+        <ThemeToggle />
       </aside>
       <div className="space-content">
         {current ? <App key={current.slug} space={current.slug} title={current.title} /> : (

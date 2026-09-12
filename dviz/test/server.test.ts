@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
 import { tmpdir } from "node:os";
 import { initializeSpace } from "../src/db/space.ts";
 import { startServer, type DvizServer } from "../src/server/server.ts";
@@ -77,6 +78,25 @@ test("POST /api/questions persists a slug and broadcasts an ID-free outline SSE 
   await reader.cancel();
 });
 
+function expectPrepaintTheme(html: string) {
+  expect(html).toContain('name="color-scheme" content="light dark"');
+  const script = /<script>([\s\S]*?)<\/script>/.exec(html);
+  expect(script).not.toBeNull();
+  expect(script!.index).toBeLessThan(html.indexOf('<link rel="stylesheet"'));
+  for (const stored of [null, "light", "dark", "invalid"]) {
+    const dataset: { theme?: string } = {};
+    runInNewContext(script![1]!, {
+      document: { documentElement: { dataset } },
+      localStorage: { getItem: () => stored },
+    });
+    expect(dataset.theme).toBe(stored === "light" || stored === "dark" ? stored : undefined);
+  }
+  expect(() => runInNewContext(script![1]!, {
+    document: { documentElement: { dataset: {} } },
+    localStorage: { getItem: () => { throw new Error("Storage blocked"); } },
+  })).not.toThrow();
+}
+
 test("the HTML route bundles the view and dinner fixtures are dev-only", async () => {
   const directory = mkdtempSync(join(tmpdir(), "dviz-server-test-"));
   temporaryDirectories.push(directory);
@@ -89,6 +109,7 @@ test("the HTML route bundles the view and dinner fixtures are dev-only", async (
   expect(htmlResponse.headers.get("content-type")).toContain("text/html");
   const html = await htmlResponse.text();
   expect(html).toContain("Decision Flow");
+  expectPrepaintTheme(html);
   expect(html).not.toContain("/app.js");
   expect((await fetch(`${productionServer.url}/api/fixtures/dinner`)).status).toBe(404);
   productionServer.stop(true);
@@ -96,6 +117,7 @@ test("the HTML route bundles the view and dinner fixtures are dev-only", async (
 
   const developmentServer = await startServer({ dbPath, port: await availablePort(), development: true });
   servers.push(developmentServer);
+  expectPrepaintTheme(await (await fetch(developmentServer.url)).text());
   const response = await fetch(`${developmentServer.url}/api/fixtures/dinner`);
   expect(response.status).toBe(200);
   const fixture = await response.json() as {
