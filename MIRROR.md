@@ -31,7 +31,7 @@ Agent rules: focus on drift/misunderstandings, not exhaustiveness, never edit.
 
 ## Recent changes ready to dogfood
 
-- Waiting on new dviz changes
+- dviz not tied to repo
 
 ## Status at a glance
 
