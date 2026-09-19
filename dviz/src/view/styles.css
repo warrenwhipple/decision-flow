@@ -144,86 +144,43 @@ ol {
   list-style: none;
 }
 
-.outline > li + li { margin-top: 10px; }
-.outline ol {
-  margin: 8px 0 2px 28px;
-  padding-left: 18px;
-  border-left: 1px solid var(--border-subtle);
-}
-.outline ol > li + li { margin-top: 8px; }
+.question-list > li + li { margin-top: 10px; }
 
+/* Relation chips sit outside the card's navigation button. */
 .question-card {
-  display: grid;
-  grid-template-columns: minmax(7rem, auto) minmax(0, 1fr) 24px 14px;
-  align-items: center;
-  row-gap: 8px;
+  display: block;
   width: 100%;
   min-height: 40px;
-  padding: 8px 12px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface-1);
   color: inherit;
+  transition: border-color var(--ease), background var(--ease);
+}
+
+.question-open {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) 24px 12px;
+  align-items: center;
+  gap: 8px 0;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius);
+  color: inherit;
+  background: transparent;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color var(--ease), background var(--ease);
 }
 
 .question-card:hover {
   border-color: var(--border-strong);
 }
 
-.transclusion-card {
-  display: grid;
-  grid-template-columns: 18px minmax(7rem, auto) minmax(0, 1fr) 14px;
-  align-items: center;
-  width: 100%;
-  min-height: 32px;
-  padding: 4px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-2);
-  background: var(--surface-1);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color var(--ease), background var(--ease);
-}
-
-.transclusion-card:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-1);
-}
-
-.transclusion-card.suggested {
-  border-style: dotted;
-  border-width: 2px;
-
-  border-color: var(--border-strong);
-}
-
-.transclusion-icon {
-  color: var(--text-3);
-  font-size: 0.92rem;
-}
-
-.transclusion-marker {
-  overflow: hidden;
-  color: var(--text-3);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.transclusion-marker strong {
-  color: var(--text-2);
-  font-family: var(--font-mono);
-  font-weight: 600;
-}
-
-.question-card:focus-visible,
-.transclusion-card:focus-visible,
+.question-open:focus-visible,
+.relation-chip:focus-visible,
 .back-button:focus-visible,
 .recenter-button:focus-visible,
 .demo-controls button:focus-visible {
@@ -758,12 +715,7 @@ footer {
 @media (max-width: 520px) {
   main, main.zoomed { width: calc(100% - 24px); padding-top: 28px; }
   header { align-items: start; flex-wrap: wrap; }
-  .outline ol { margin-left: 12px; padding-left: 10px; }
-  .question-card { grid-template-columns: minmax(0, 1fr) 22px 10px; }
-  .transclusion-card { grid-template-columns: 18px minmax(0, 1fr) 10px; }
-  .transclusion-card .question-slug { grid-column: 2; }
-  .transclusion-marker { grid-column: 2; grid-row: 2; margin-top: 2px; }
-  .transclusion-card .open-cue { grid-column: 3; grid-row: 1 / span 2; }
+  .question-open { grid-template-columns: minmax(0, 1fr) 22px 10px; }
   .question-card .question-slug { grid-column: 1; margin-bottom: 5px; }
   .question-copy { grid-column: 1; }
   .question-card .resolution { grid-column: 2; grid-row: 1 / span 2; }
@@ -880,3 +832,16 @@ footer {
 /* Focus wins over selected-state borders without changing suggested outlines. */
 .question-card .option-chip.selected.focus-target,
 .option-card.selected.focus-target { border-color: var(--accent); }
+
+.relation-chips, .option-raises { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.relation-chips { margin: 0 12px 12px; }
+.relation-context, .relation-detail { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.relation-label { color: var(--text-3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+.relation-chip { margin: 0; border: 1px solid var(--border-subtle); text-decoration: none; line-height: 1.2; }
+.relation-chip.suggested { border: 2px dotted var(--border-strong); }
+a.relation-chip:hover { border-color: var(--border-strong); }
+.detail-relations { margin: 20px 0; }
+.relation-group { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 12px; align-items: baseline; margin-top: 8px; }
+.relation-group > div { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.relation-note { color: var(--text-2); font-size: 12px; }
+.option-raises { margin: 12px 0; }

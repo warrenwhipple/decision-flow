@@ -122,7 +122,7 @@ test("the HTML route bundles the view and dinner fixtures are dev-only", async (
   expect(response.status).toBe(200);
   const fixture = await response.json() as {
     questions: Array<{ slug: string; resolution: string; resolvedOptionSlug: string | null }>;
-    placements: Array<{ childSlug: string; parentSlug: string | null; canonical: boolean; acceptance: string }>;
+    relations: Array<{ kind: string; from: string; to: string; acceptance: string }>;
     assessments: Array<{ polarity: string }>;
     focus: { kind: string; reference: string };
   };
@@ -132,10 +132,10 @@ test("the HTML route bundles the view and dinner fixtures are dev-only", async (
     resolution: "leaning",
     resolvedOptionSlug: "braise",
   });
-  expect(fixture.placements.filter(({ childSlug }) => childSlug === "wine")).toEqual([
-    expect.objectContaining({ parentSlug: "main-course", canonical: true }),
-    expect.objectContaining({ parentSlug: "drinks", canonical: false, acceptance: "suggested" }),
+  expect(fixture.relations.filter(({ to }) => to === "wine")).toEqual([
+    expect.objectContaining({ kind: "blocks", from: "main-course" }),
   ]);
+  expect(fixture.relations).toContainEqual(expect.objectContaining({ kind: "part-of", from: "wine", to: "drinks" }));
   expect(new Set(fixture.assessments.map(({ polarity }) => polarity))).toEqual(new Set(["+", "-", "~", "?"]));
   expect(fixture.focus).toEqual(expect.objectContaining({ kind: "question", reference: "main-course" }));
 });
@@ -160,7 +160,7 @@ test("command and projection APIs cover the slug-first v0 CLI lifecycle", async 
 
   await run("question.add", { slug: "route", title: "Choose a route" });
   await run("question.add", { slug: "delivery", title: "Choose delivery" });
-  await run("place", { childSlug: "route", parentSlug: "delivery" });
+  await run("relation.add", { kind: "part-of", from: "route", to: "delivery" });
   await run("question.update", { questionSlug: "route", slug: "travel-route" });
   await run("option.add", { questionSlug: "travel-route", slug: "north", title: "Northern route" });
   await run("option.update", { optionPath: "travel-route/north", slug: "northern" });
@@ -170,7 +170,8 @@ test("command and projection APIs cover the slug-first v0 CLI lifecycle", async 
   await run("question.decide", { questionSlug: "travel-route", optionSlug: "northern" });
   await run("focus", { kind: "option", reference: "travel-route/northern" });
   await run("accept", { kind: "question", reference: "travel-route" });
-  await run("accept", { kind: "placement", reference: "travel-route:root" });
+  await run("accept", { kind: "relation", reference: "part-of:travel-route:delivery" });
+  await run("accept", { kind: "relevance", reference: "travel-route:speed" });
 
   const outline = await (await fetch(`${server.url}/api/outline`)).json() as Record<string, unknown[]>;
   expect(outline).toMatchObject({
@@ -178,11 +179,8 @@ test("command and projection APIs cover the slug-first v0 CLI lifecycle", async 
       { slug: "travel-route", resolution: "decided", resolvedOptionSlug: "northern", acceptance: "accepted" },
       { slug: "delivery", resolution: "open", acceptance: "suggested" },
     ],
-    placements: [
-      { childSlug: "travel-route", parentSlug: null, acceptance: "accepted", canonical: true },
-      { childSlug: "delivery", parentSlug: null, canonical: true },
-      { childSlug: "travel-route", parentSlug: "delivery", canonical: false },
-    ],
+    relations: [{ kind: "part-of", from: "travel-route", to: "delivery", acceptance: "accepted" }],
+    relevances: [{ questionSlug: "travel-route", criterionSlug: "speed", acceptance: "accepted" }],
     options: [{ questionSlug: "travel-route", slug: "northern", acceptance: "suggested" }],
     focus: { kind: "option", reference: "travel-route/northern" },
   });
@@ -195,6 +193,15 @@ test("command and projection APIs cover the slug-first v0 CLI lifecycle", async 
   expect(log).toContain("rename question");
   expect(log).toContain('"question":"travel-route"');
   expect(criterion.slug).toBe("speed");
+  await run("question.add", { slug: "raised", title: "Raised", raisedBy: "travel-route/northern", after: "first" });
+  await run("question.add", { slug: "part", title: "Part", partOf: "delivery" });
+  await run("question.move", { questionSlug: "raised", after: "part" });
+  const moved = await (await fetch(`${server.url}/api/outline`)).json() as { questions: { slug: string }[] };
+  expect(moved.questions.map((q) => q.slug)).toEqual(["travel-route", "part", "raised", "delivery"]);
+  const posted = await fetch(`${server.url}/api/questions`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ slug: "posted", title: "Posted", partOf: "delivery", raisedBy: "travel-route/northern", after: "first" }) });
+  expect(posted.status).toBe(201);
+  expect(await posted.json()).toMatchObject({ question: { slug: "posted", position: expect.any(Number) } });
 });
 
 test("slug validation failures stay readable at the HTTP boundary", async () => {
@@ -226,8 +233,8 @@ test("the real CLI parses slug-first question, option, status, and projection co
     .toContain("Added suggested question route");
   expect(await runCli(dbPath, server, "question", "add", "delivery", "Choose delivery"))
     .toContain("Added suggested question delivery");
-  expect(await runCli(dbPath, server, "place", "--question", "route", "--parent", "delivery"))
-    .toContain("Placed suggested question route under delivery");
+  expect(await runCli(dbPath, server, "relation", "add", "part-of", "route", "delivery"))
+    .toContain("Added suggested relation part-of:route:delivery");
   expect(await runCli(dbPath, server, "option", "add", "--question", "route", "north", "Northern route"))
     .toContain("route/north");
   expect(await runCli(dbPath, server, "option", "update", "route/north", "--slug", "northern"))
@@ -238,4 +245,10 @@ test("the real CLI parses slug-first question, option, status, and projection co
     .toContain("Focused option route/northern");
   expect(await runCli(dbPath, server, "outline")).toContain("● route: Choose a route → northern");
   expect(await runCli(dbPath, server, "show", "option", "route/northern")).toContain("# route/northern: Northern route");
+  expect(await runCli(dbPath, server, "question", "add", "raised", "Raised question", "--raised-by", "route/northern", "--first")).toContain("Added suggested question raised");
+  expect(await runCli(dbPath, server, "accept", "relation", "raises:route/northern:raised")).toContain("Accepted relation");
+  expect(await runCli(dbPath, server, "question", "move", "raised", "--after", "delivery")).toContain("Moved question raised");
+  expect(await runCli(dbPath, server, "outline", "--around", "raised", "--hops", "0")).not.toContain("route:");
+  expect(await runCli(dbPath, server, "remove", "question", "route")).toContain("Removed question route");
+  expect(await runCli(dbPath, server, "outline")).not.toContain("raised by");
 });

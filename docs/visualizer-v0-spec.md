@@ -68,6 +68,8 @@ Every question, option, and criterion carries a required human-minted-or-agent-m
 
 ### Tables (proposed DDL sketch)
 
+**2026-09-13:** Typed relations and a flat ordered question list supersede nesting. See the [typed-relations handoff](<handoffs/2026-09-13 1024 dviz-typed-relations-flat-list.md>) for semantics, migration, and rendering; `dviz/src/db/schema.ts` is the current DDL.
+
 ```sql
 CREATE TABLE questions (
   id INTEGER PRIMARY KEY,         -- internal only; never surfaced above SQL
@@ -80,14 +82,9 @@ CREATE TABLE questions (
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 
--- Question topology is a DAG. Rendered transclusion-style, never as a graph.
-CREATE TABLE question_parents (
-  child_id INTEGER NOT NULL REFERENCES questions(id),
-  parent_id INTEGER REFERENCES questions(id),   -- NULL = root-level outline entry
-  position REAL NOT NULL,                       -- ordering within the parent
-  UNIQUE (child_id, parent_id)
-);
--- write-time check: inserting/updating must not create a cycle
+-- v4: questions have a global position REAL NOT NULL DEFAULT 0.
+-- question_parents is replaced by typed relations (raises, part-of, blocks).
+-- See the typed-relations handoff and src/db/schema.ts for the complete DDL.
 
 CREATE TABLE options (
   id INTEGER PRIMARY KEY,
@@ -160,7 +157,7 @@ All addressing is by slug; integer IDs never appear on this surface. `QSLUG` = q
 ```
 dviz init [--db <path>]           create a decision space (default .dviz/space.db, gitignored)
 dviz serve [--db <path>] [--port] start server + view
-dviz question add <slug> "title" [--parent QSLUG] [--detail ...]
+dviz question add <slug> "title" [--part-of QSLUG] [--raised-by QSLUG/OSLUG] [--after QSLUG | --first] [--detail ...]
 dviz question update QSLUG [--slug NEW] [...]
 dviz question lean QSLUG --option OSLUG
 dviz question decide QSLUG --option OSLUG
@@ -168,13 +165,14 @@ dviz question reopen QSLUG
 dviz option add --question QSLUG <slug> "title" [--detail ...]
 dviz option update QSLUG/OSLUG [--slug NEW] [...]
 dviz criterion add <slug> [--desc ...]
-dviz place --question CHILD_QSLUG --parent PARENT_QSLUG
+dviz relation add raises|part-of|blocks FROM TO [--note ...]
+dviz question move QSLUG (--after QSLUG | --first)
 dviz assess --option QSLUG/OSLUG --criterion CSLUG --polarity +|-|~|? [--note ...]
 dviz relate --question QSLUG --criterion CSLUG
 dviz accept <kind> <slug>           suggested → accepted (any entity or edge)
 dviz remove <kind> <slug>
 dviz focus <kind> <slug>
-dviz outline [--depth N] [--around QSLUG] [--ids]   compact markdown projection for agent re-reads
+dviz outline [--around QSLUG] [--hops N] [--ids]   compact markdown projection for agent re-reads
 dviz show <kind> <slug>                             full detail of one node
 dviz log [--since ...]                              recent edits
 ```
@@ -185,7 +183,7 @@ Notes: everything an agent creates defaults to `suggested`; `accept` is the huma
 
 Two views plus one deferred:
 
-1. **Overview outline** — the default. Ordered, dense, long-thin cards (slug chip + title + status glyphs), recursive outline of questions; options visible inline or one drill-in down **(proposed: inline, collapsed to titles)**. Used to see live decisions and pick the next one to work.
+1. **Flat question list** — the default. Ordered, dense, long-thin cards (slug chip + title + status glyphs), one per question in manual position order; options appear as slug chips and inbound relation context appears below the title. Used to see live decisions and pick the next one to work.
 2. **Zoomed decision view** — one question: all options with details, assessments as slug chips with +/−/~/? polarity and notes, plus criteria attached via `question_criteria`. Shown criteria = relevance edges ∪ criteria appearing in the options' assessments.
 3. **Global criteria list** (sort/filter) — build only if time allows; not demo-critical.
 
@@ -193,7 +191,7 @@ Rendering rules:
 
 - **Slug chips anchor every card.** Each card leads with its slug as a monospace chip, then the title, then status glyphs — a left-anchored column of short recognizable tokens is what makes the dense outline scannable (and it matches the criteria chips already in the zoomed view). Options in the overview outline collapse to slug-only **(proposed)**; titles appear in the zoomed view. Criterion chips, question slugs, and option slugs get distinct styling so cross-kind homonyms stay unambiguous.
 - **Statuses legible at a glance.** `suggested` = dotted card outline, at every appearance. `decided` / `leaning` / `open` get distinct glyphs/affordances on the card **(proposed: filled dot / half dot / empty dot + selected-option shown on decided/leaning cards)**.
-- **Transclusion.** A multi-parent question renders under each parent. Its first parent is its canonical appearance (focus jumps go there); secondary appearances render collapsed with an "also under X" marker.
+- **Typed relations.** One card per question, with non-interactive context chips in the list and navigable links in the detail view. See the [typed-relations handoff](<handoffs/2026-09-13 1024 dviz-typed-relations-flat-list.md>).
 - **Follow mode.** View follows the focus pointer by default; any manual scroll/drill breaks follow; a persistent recenter button returns to the conversation's current focus and re-engages following. v0 focus is a single node id.
 - **Layout stability.** New cards insert; nothing reflows. This is the reason the outline beat a graph canvas — protect it.
 
@@ -203,7 +201,7 @@ Rendering rules:
 2. Full CLI surface + statuses + dotted rendering.
 3. Zoomed decision view + assessments/chips.
 4. Focus + follow mode.
-5. Transclusion details (multi-parent, collapse, canonical).
+5. Typed relations and flat-list rendering (supersedes transclusion; see the handoff).
 6. Polish pass for the JC demo; dogfood on Lightsight; global criteria list only if hours remain.
 
 ## Open questions (parked, not blocking)

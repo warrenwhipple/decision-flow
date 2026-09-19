@@ -7,7 +7,8 @@ import {
   acceptEntity,
   addCriterion,
   addOption,
-  addPlacement,
+  addRelation,
+  moveQuestion,
   addQuestion,
   getEdits,
   getOutline,
@@ -44,7 +45,7 @@ describe("decision space", () => {
     const optionColumns = db.query("PRAGMA table_info(options)").all() as { name: string; notnull: number }[];
     expect(questionColumns).toContainEqual(expect.objectContaining({ name: "slug", notnull: 1 }));
     expect(optionColumns).toContainEqual(expect.objectContaining({ name: "slug", notnull: 1 }));
-    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(3);
+    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(4);
     db.close();
   });
 
@@ -104,46 +105,77 @@ describe("decision space", () => {
     db.close();
   });
 
-  test("adds suggested slug-addressed questions and ordered children transactionally", () => {
+  test("inserts related questions in order and rolls back bad relations", () => {
     const { db } = testSpace();
-    addQuestion(db, { slug: "parent", title: " Parent ", actor: "agent:test" });
-    addQuestion(db, { slug: "first-child", title: "First", parentSlug: "parent", actor: "agent:test" });
-    addQuestion(db, { slug: "second-child", title: "Second", parentSlug: "parent", actor: "agent:test" });
-    expect(getOutline(db)).toMatchObject({
-      questions: [
-        { slug: "parent", title: "Parent", acceptance: "suggested", resolution: "open" },
-        { slug: "first-child" },
-        { slug: "second-child" },
-      ],
-      placements: [
-        { childSlug: "parent", parentSlug: null, position: 1, acceptance: "suggested", canonical: true },
-        { childSlug: "first-child", parentSlug: "parent", position: 1, acceptance: "suggested", canonical: true },
-        { childSlug: "second-child", parentSlug: "parent", position: 2, acceptance: "suggested", canonical: true },
-      ],
-    });
-    expect(getEdits(db)[0]!.payload).toMatchObject({ slug: "parent", parent: "root" });
+    const actor = "agent:test";
+    addQuestion(db, { slug: "parent", title: "Parent", actor });
+    addQuestion(db, { slug: "last", title: "Last", actor });
+    addOption(db, { questionSlug: "parent", slug: "choice", title: "Choice", actor });
+    addQuestion(db, { slug: "child", title: "Child", partOf: "parent", actor });
+    addQuestion(db, { slug: "child-two", title: "Second child", partOf: "parent", actor });
+    addQuestion(db, { slug: "raised", title: "Raised", raisedBy: "parent/choice", actor });
+    addQuestion(db, { slug: "raised-two", title: "Raised too", raisedBy: "parent/choice", actor });
+    expect(getOutline(db).questions.map((q) => q.slug)).toEqual(["parent", "raised", "raised-two", "child", "child-two", "last"]);
+    const before = getOutline(db);
+    const edits = getEdits(db);
+    expect(() => addQuestion(db, { slug: "bad", title: "Bad", partOf: "child", raisedBy: "missing/choice", after: "first", actor })).toThrow("does not exist");
+    expect(getOutline(db)).toEqual(before);
+    expect(getEdits(db)).toEqual(edits);
+    moveQuestion(db, "last", "first", actor);
+    moveQuestion(db, "child", "raised-two", actor);
+    expect(getOutline(db).questions.map((q) => q.slug)).toEqual(["last", "parent", "raised", "raised-two", "child", "child-two"]);
+    expect(() => moveQuestion(db, "child", "child", actor)).toThrow("itself");
+    addQuestion(db, { slug: "first", title: "First", after: "first", actor });
+    expect(getOutline(db).questions[0]!.slug).toBe("first");
     db.close();
   });
 
-  test("adds acyclic transclusions while preserving the first parent as canonical", () => {
+  test("enforces relation kinds, endpoints, duplicates, and per-kind projected cycles", () => {
     const { db } = testSpace();
-    addQuestion(db, { slug: "product", title: "Choose the product", actor: "agent:test" });
-    addQuestion(db, { slug: "delivery", title: "Choose delivery", actor: "agent:test" });
-    addQuestion(db, { slug: "pricing", title: "Choose pricing", parentSlug: "product", actor: "agent:test" });
-    addQuestion(db, { slug: "billing", title: "Choose billing", parentSlug: "pricing", actor: "agent:test" });
+    const actor = "agent:test";
+    for (const slug of ["a", "b", "c"]) {
+      addQuestion(db, { slug, title: slug, actor });
+      addOption(db, { questionSlug: slug, slug: "choice", title: "Choice", actor });
+    }
+    for (const kind of ["part-of", "blocks", "raises"] as const) {
+      const from = (slug: string) => kind === "raises" ? `${slug}/choice` : slug;
+      expect(addRelation(db, { kind, from: from("a"), to: "b", actor }).acceptance).toBe("suggested");
+      addRelation(db, { kind, from: from("b"), to: "c", actor });
+      expect(() => addRelation(db, { kind, from: from("c"), to: "a", actor })).toThrow(`${kind} cycle`);
+      expect(() => addRelation(db, { kind, from: from("a"), to: "b", actor })).toThrow("already exists");
+      expect(() => addRelation(db, { kind, from: from("a"), to: "a", actor })).toThrow("itself");
+      expect(() => addRelation(db, { kind, from: kind === "raises" ? "a" : "a/choice", to: "b", actor })).toThrow("requires");
+    }
+    removeEntity(db, "relation", "blocks:a:b", "human");
+    removeEntity(db, "relation", "blocks:b:c", "human");
+    addRelation(db, { kind: "blocks", from: "b", to: "a", actor }); // opposite to part-of is legitimate
+    acceptEntity(db, "relation", "raises:a/choice:b", "human");
+    expect(getOutline(db).relations.find((r) => r.kind === "raises" && r.from === "a/choice")!.acceptance).toBe("accepted");
+    updateQuestion(db, "a", { slug: "renamed", actor });
+    updateOption(db, "renamed/choice", { slug: "new", actor });
+    expect(getOutline(db).relations).toContainEqual(expect.objectContaining({ from: "renamed/new" }));
+    removeEntity(db, "option", "renamed/new", "human");
+    expect(getOutline(db).relations.some((r) => r.from === "renamed/new")).toBe(false);
+    removeEntity(db, "question", "b", "human");
+    expect(getOutline(db).relations).toEqual([]);
+    db.close();
+  });
 
-    expect(addPlacement(db, { childSlug: "pricing", parentSlug: "delivery", actor: "agent:test" }))
-      .toMatchObject({ childSlug: "pricing", parentSlug: "delivery", canonical: false, acceptance: "suggested" });
-    expect(getOutline(db).placements.filter(({ childSlug }) => childSlug === "pricing")).toEqual([
-      expect.objectContaining({ parentSlug: "product", canonical: true }),
-      expect.objectContaining({ parentSlug: "delivery", canonical: false }),
-    ]);
-    expect(renderOutline(db)).toContain("↳ pricing (also under product) [suggested]");
-    expect(renderOutline(db).match(/billing: Choose billing/g)).toHaveLength(1);
-    expect(() => addPlacement(db, { childSlug: "product", parentSlug: "billing", actor: "agent:test" }))
-      .toThrow("would create a question cycle");
-    expect(() => addPlacement(db, { childSlug: "pricing", parentSlug: "delivery", actor: "agent:test" }))
-      .toThrow("already placed under delivery");
+  test("renders both relation directions, notes, and undirected hop neighborhoods", () => {
+    const { db } = testSpace();
+    const actor = "agent:test";
+    for (const slug of ["menu", "main", "cut", "sides", "other"]) addQuestion(db, { slug, title: slug, actor });
+    addOption(db, { questionSlug: "main", slug: "braise", title: "Braise", actor });
+    addRelation(db, { kind: "part-of", from: "main", to: "menu", actor });
+    addRelation(db, { kind: "raises", from: "main/braise", to: "cut", actor });
+    addRelation(db, { kind: "blocks", from: "main", to: "sides", note: "pairing follows the main", actor });
+    expect(renderOutline(db)).toContain("(part of menu? · raises braise→cut? · blocks sides?)");
+    expect(renderOutline(db)).toContain("(raised by main/braise?)");
+    expect(renderEntity(db, "question", "sides")).toContain("Blocked by: main [suggested] — pairing follows the main");
+    expect(renderOutline(db, { around: "cut" }).split("\n").filter(Boolean)).toHaveLength(2);
+    expect(renderOutline(db, { around: "cut", hops: 2 }).split("\n").filter(Boolean)).toHaveLength(4);
+    expect(renderOutline(db, { around: "cut", hops: 0 }).split("\n").filter(Boolean)).toHaveLength(1);
+    expect(renderOutline(db, { around: "cut", hops: 3 })).not.toContain("other:");
     db.close();
   });
 
@@ -159,11 +191,10 @@ describe("decision space", () => {
     setQuestionResolution(db, "travel-route", "leaning", "north", "human");
 
     acceptEntity(db, "question", "travel-route", "human");
-    acceptEntity(db, "placement", "travel-route:root", "human");
     acceptEntity(db, "option", "travel-route/north", "human");
     acceptEntity(db, "criterion", "focus-flow", "human");
     acceptEntity(db, "assessment", "travel-route/north:focus-flow", "human");
-    acceptEntity(db, "relation", "travel-route:focus-flow", "human");
+    acceptEntity(db, "relevance", "travel-route:focus-flow", "human");
     setQuestionResolution(db, "travel-route", "decided", "north", "human");
     setFocus(db, "question", "travel-route", "agent:test");
 
@@ -174,11 +205,10 @@ describe("decision space", () => {
         optionPath: "travel-route/north", criterionSlug: "focus-flow", polarity: "+",
         note: "Few interruptions.", acceptance: "accepted",
       }],
-      relations: [{ questionSlug: "travel-route", criterionSlug: "focus-flow", acceptance: "accepted" }],
+      relevances: [{ questionSlug: "travel-route", criterionSlug: "focus-flow", acceptance: "accepted" }],
     });
     expect(JSON.stringify(getOutline(db))).not.toMatch(/"(?:id|questionId|optionId|criterionId)"/);
     expect(renderOutline(db)).toContain("● travel-route: Which path now? → north");
-    expect(renderOutline(db)).toContain("- north");
     expect(renderOutline(db)).not.toContain("[suggested]");
     expect(renderEntity(db, "option", "travel-route/north")).toContain("+ focus-flow [accepted] — Few interruptions.");
     expect(getEdits(db).filter(({ verb }) => verb === "rename")).toHaveLength(2);
@@ -221,10 +251,10 @@ describe("decision space", () => {
     db.close();
   });
 
-  test("removes by slug and re-roots surviving children", () => {
+  test("removes by slug and leaves surviving questions in place", () => {
     const { db } = testSpace();
     addQuestion(db, { slug: "parent", title: "Parent", actor: "agent:test" });
-    addQuestion(db, { slug: "child", title: "Child", parentSlug: "parent", actor: "agent:test" });
+    addQuestion(db, { slug: "child", title: "Child", partOf: "parent", actor: "agent:test" });
     addOption(db, { questionSlug: "parent", slug: "chosen", title: "Chosen", actor: "agent:test" });
     addCriterion(db, { slug: "trust", actor: "agent:test" });
     setAssessment(db, { optionPath: "parent/chosen", criterionSlug: "trust", polarity: "+", actor: "agent:test" });
@@ -232,7 +262,7 @@ describe("decision space", () => {
     removeEntity(db, "question", "parent", "human");
     expect(getOutline(db)).toMatchObject({
       questions: [{ slug: "child" }],
-      placements: [{ childSlug: "child", parentSlug: null, acceptance: "suggested" }],
+      relations: [],
       options: [],
     });
     expect(db.query("SELECT COUNT(*) AS count FROM assessments").get()).toEqual({ count: 0 });

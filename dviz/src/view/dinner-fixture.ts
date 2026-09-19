@@ -4,9 +4,9 @@ import type {
   Criterion,
   Option,
   OutlineSnapshot,
-  Placement,
+  QuestionRelation,
   Question,
-  Relation,
+  Relevance,
   Resolution,
 } from "../db/space.ts";
 
@@ -20,17 +20,11 @@ function question(
   acceptance: Acceptance = "accepted",
   detail = "",
 ): Question {
-  return { slug, title, detail, acceptance, resolution, resolvedOptionSlug, createdAt, updatedAt: createdAt };
+  return { slug, title, detail, acceptance, resolution, resolvedOptionSlug, position: 0, createdAt, updatedAt: createdAt };
 }
 
-function placement(
-  childSlug: string,
-  parentSlug: string | null,
-  position: number,
-  canonical = true,
-  acceptance: Acceptance = "accepted",
-): Placement {
-  return { childSlug, parentSlug, position, acceptance, canonical };
+function relation(kind: QuestionRelation["kind"], from: string, to: string, acceptance: Acceptance = "accepted", note = ""): QuestionRelation {
+  return { kind, fromKind: kind === "raises" ? "option" : "question", from, to, acceptance, note };
 }
 
 function option(
@@ -62,19 +56,21 @@ function assessment(
   return { optionPath, criterionSlug, polarity, note, acceptance };
 }
 
-function relation(
+function relevance(
   questionSlug: string,
   criterionSlug: string,
   acceptance: Acceptance = "accepted",
-): Relation {
+): Relevance {
   return { questionSlug, criterionSlug, acceptance };
 }
 
 export const dinnerFixture: OutlineSnapshot = {
   questions: [
     question("menu", "What should we serve?"),
+    question("service-style", "Family style or plated?"),
     question("main-course", "What anchors the meal?", "leaning", "braise", "accepted", "The centerpiece sets the tone for everything around it."),
-    question("protein", "Which centerpiece protein?", "decided", "chicken"),
+    question("braise-cut", "Which cut for the braise?", "decided", "short-rib"),
+    question("roast-bird", "Which bird to roast?", "open", null, "suggested"),
     question("sides", "Which sides belong on the table?"),
     question("starter", "What begins the meal?", "decided", "soup"),
     question("dessert", "What ends the meal?", "leaning", "tart", "suggested"),
@@ -85,32 +81,35 @@ export const dinnerFixture: OutlineSnapshot = {
     question("timing", "How should the evening run?"),
     question("serve-time", "When should dinner land?", "decided", "seven"),
     question("prep-order", "What gets cooked first?"),
-  ],
-  placements: [
-    placement("menu", null, 0),
-    placement("drinks", null, 1),
-    placement("seating", null, 2),
-    placement("timing", null, 3),
-    placement("main-course", "menu", 0),
-    placement("starter", "menu", 1),
-    placement("dessert", "menu", 2, true, "suggested"),
-    placement("protein", "main-course", 0),
-    placement("sides", "main-course", 1),
-    placement("wine", "main-course", 2),
-    placement("wine", "drinks", 0, false, "suggested"),
-    placement("table-layout", "seating", 0, true, "suggested"),
-    placement("serve-time", "timing", 0),
-    placement("prep-order", "timing", 1),
+  ].map((question, index) => ({ ...question, position: index + 1 })),
+  relations: [
+    relation("part-of", "service-style", "menu"),
+    relation("part-of", "main-course", "menu"),
+    relation("raises", "main-course/braise", "braise-cut"),
+    relation("raises", "main-course/roast", "roast-bird", "suggested"),
+    relation("part-of", "sides", "menu"),
+    relation("blocks", "main-course", "sides"),
+    relation("part-of", "starter", "menu"),
+    relation("part-of", "dessert", "menu", "suggested"),
+    relation("part-of", "wine", "drinks"),
+    relation("blocks", "main-course", "wine", "accepted", "pairing follows the main"),
+    relation("part-of", "table-layout", "seating", "suggested"),
+    relation("part-of", "serve-time", "timing"),
+    relation("part-of", "prep-order", "timing"),
+    relation("blocks", "serve-time", "prep-order"),
+    relation("blocks", "main-course", "prep-order", "suggested"),
   ],
   options: [
-    option("menu", "family-style", "Family style", 0),
-    option("menu", "plated", "Plated courses", 1),
+    option("service-style", "family-style", "Family style", 0),
+    option("service-style", "plated", "Plated courses", 1),
     option("main-course", "braise", "Red-wine braise", 0, "accepted", "Rich, forgiving, and ready before guests arrive."),
     option("main-course", "roast", "Herb roast", 1, "accepted", "A dramatic centerpiece that needs careful timing."),
     option("main-course", "pasta", "Filled pasta", 2, "suggested", "Festive and friendly to a meat-free table."),
-    option("protein", "chicken", "Roast chicken", 0),
-    option("protein", "beef", "Braised beef", 1),
-    option("protein", "mushrooms", "Glazed mushrooms", 2),
+    option("braise-cut", "short-rib", "Short rib", 0),
+    option("braise-cut", "chuck", "Chuck", 1),
+    option("braise-cut", "shank", "Shank", 2),
+    option("roast-bird", "chicken", "Chicken", 0),
+    option("roast-bird", "duck", "Duck", 1),
     option("sides", "greens", "Bitter greens", 0),
     option("sides", "potatoes", "Crisp potatoes", 1),
     option("sides", "squash", "Roasted squash", 2, "suggested"),
@@ -158,28 +157,65 @@ export const dinnerFixture: OutlineSnapshot = {
     assessment("wine/pinot", "cost", "~", "Good bottles span the budget."),
     assessment("wine/pinot", "dietary", "+", "Works for the whole guest list."),
   ],
-  relations: [
-    relation("main-course", "cost"),
-    relation("main-course", "prep-time"),
-    relation("main-course", "make-ahead"),
-    relation("main-course", "dietary"),
-    relation("main-course", "seasonality"),
-    relation("main-course", "wow-factor", "suggested"),
-    relation("protein", "cost"),
-    relation("protein", "dietary"),
-    relation("protein", "wow-factor"),
-    relation("sides", "prep-time"),
-    relation("sides", "dietary"),
-    relation("sides", "seasonality"),
-    relation("starter", "make-ahead"),
-    relation("starter", "seasonality"),
-    relation("dessert", "make-ahead"),
-    relation("dessert", "wow-factor", "suggested"),
-    relation("wine", "cost"),
-    relation("wine", "seasonality"),
-    relation("wine", "wow-factor"),
-    relation("timing", "prep-time"),
-    relation("timing", "make-ahead"),
+  relevances: [
+    relevance("main-course", "cost"),
+    relevance("main-course", "prep-time"),
+    relevance("main-course", "make-ahead"),
+    relevance("main-course", "dietary"),
+    relevance("main-course", "seasonality"),
+    relevance("main-course", "wow-factor", "suggested"),
+    relevance("braise-cut", "cost"),
+    relevance("braise-cut", "dietary"),
+    relevance("braise-cut", "wow-factor"),
+    relevance("sides", "prep-time"),
+    relevance("sides", "dietary"),
+    relevance("sides", "seasonality"),
+    relevance("starter", "make-ahead"),
+    relevance("starter", "seasonality"),
+    relevance("dessert", "make-ahead"),
+    relevance("dessert", "wow-factor", "suggested"),
+    relevance("wine", "cost"),
+    relevance("wine", "seasonality"),
+    relevance("wine", "wow-factor"),
+    relevance("timing", "prep-time"),
+    relevance("timing", "make-ahead"),
   ],
   focus: { kind: "question", reference: "main-course", setAt: createdAt },
 };
+
+/** Dev-only stress shapes retain valid endpoints and deterministic list order. */
+export function dinnerShape(shape: string | null): OutlineSnapshot {
+  const snapshot = structuredClone(dinnerFixture);
+  if (shape === "empty") return { questions: [], options: [], criteria: [], assessments: [], relevances: [], relations: [], focus: null };
+  if (shape === "single") {
+    const slug = "main-course";
+    return { ...snapshot, questions: snapshot.questions.filter((q) => q.slug === slug),
+      options: snapshot.options.filter((o) => o.questionSlug === slug),
+      relevances: snapshot.relevances.filter((r) => r.questionSlug === slug),
+      assessments: snapshot.assessments.filter((a) => a.optionPath.startsWith(`${slug}/`)), relations: [] };
+  }
+  if (shape === "all-suggested") {
+    for (const entities of [snapshot.questions, snapshot.options, snapshot.criteria, snapshot.assessments, snapshot.relevances, snapshot.relations]) {
+      for (const entity of entities) entity.acceptance = "suggested";
+    }
+  }
+  if (shape === "big") {
+    const copies = Array.from({ length: 8 }, (_, i) => {
+      const suffix = (slug: string) => `${slug}-${i + 1}`;
+      const path = (value: string) => value.split("/").map(suffix).join("/");
+      return {
+        questions: snapshot.questions.map((q, j) => ({ ...q, slug: suffix(q.slug), resolvedOptionSlug: q.resolvedOptionSlug ? suffix(q.resolvedOptionSlug) : null, position: i * snapshot.questions.length + j + 1 })),
+        options: snapshot.options.map((o) => ({ ...o, questionSlug: suffix(o.questionSlug), slug: suffix(o.slug) })),
+        criteria: snapshot.criteria.map((c) => ({ ...c, slug: suffix(c.slug) })),
+        assessments: snapshot.assessments.map((a) => ({ ...a, optionPath: path(a.optionPath), criterionSlug: suffix(a.criterionSlug) })),
+        relevances: snapshot.relevances.map((r) => ({ ...r, questionSlug: suffix(r.questionSlug), criterionSlug: suffix(r.criterionSlug) })),
+        relations: snapshot.relations.map((r) => ({ ...r, from: path(r.from), to: suffix(r.to) })),
+      };
+    });
+    return { questions: copies.flatMap((c) => c.questions), options: copies.flatMap((c) => c.options),
+      criteria: copies.flatMap((c) => c.criteria), assessments: copies.flatMap((c) => c.assessments),
+      relevances: copies.flatMap((c) => c.relevances), relations: copies.flatMap((c) => c.relations),
+      focus: { kind: "question", reference: "main-course-1", setAt: createdAt } };
+  }
+  return snapshot;
+}

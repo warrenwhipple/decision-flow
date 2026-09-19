@@ -1,12 +1,14 @@
 import type { Database } from "bun:sqlite";
 import { SpaceLibrary, libraryPath } from "../db/library.ts";
 import index from "../view/index.html";
-import { dinnerFixture } from "../view/dinner-fixture.ts";
+import { dinnerShape } from "../view/dinner-fixture.ts";
 import {
   acceptEntity,
   addCriterion,
   addOption,
-  addPlacement,
+  addRelation,
+  moveQuestion,
+  validateRelationKind,
   addQuestion,
   DEFAULT_PORT,
   getOutline,
@@ -55,10 +57,10 @@ function errorResponse(error: unknown, status = 400): Response {
   return json({ error: message }, status);
 }
 
-function requiredInteger(value: unknown, label: string): number {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${label} must be a positive integer.`);
-  return parsed;
+function questionRelations(body: Record<string, unknown>) {
+  if ("parentSlug" in body) throw new Error("parentSlug was removed; use partOf or raisedBy.");
+  return Object.fromEntries(["partOf", "raisedBy", "after"].filter((key) => body[key] !== undefined)
+    .map((key) => [key, requiredString(body[key], key)])) as { partOf?: string; raisedBy?: string; after?: string };
 }
 
 function requiredString(value: unknown, label: string): string {
@@ -97,7 +99,7 @@ export async function startServer(options: StartServerOptions): Promise<DvizServ
         const url = new URL(request.url);
 
         if (request.method === "GET" && url.pathname === "/api/fixtures/dinner" && options.development) {
-          return json(dinnerFixture);
+          return json(dinnerShape(url.searchParams.get("shape")));
         }
         // Reject cross-origin browser writes to this local service.
         if (request.method === "POST" && request.headers.get("origin") && request.headers.get("origin") !== url.origin) {
@@ -137,12 +139,13 @@ export async function startServer(options: StartServerOptions): Promise<DvizServ
         }
         if (request.method === "GET" && url.pathname === "/api/outline.md") {
           try {
-            const depthValue = url.searchParams.get("depth");
+            const hopsValue = url.searchParams.get("hops");
+            if (url.searchParams.has("depth")) throw new Error("--depth was removed; use --around and --hops.");
             const aroundValue = url.searchParams.get("around");
-            const depth = depthValue === null ? undefined : requiredInteger(depthValue, "depth");
+            const hops = hopsValue === null ? undefined : Number(hopsValue);
             const around = aroundValue ?? undefined;
             const ids = url.searchParams.has("ids");
-            return new Response(renderOutline(db, { depth, around, ids }), {
+            return new Response(renderOutline(db, { hops, around, ids }), {
               headers: { "Content-Type": "text/markdown; charset=utf-8", "Cache-Control": "no-store" },
             });
           } catch (error) {
@@ -202,7 +205,7 @@ export async function startServer(options: StartServerOptions): Promise<DvizServ
               slug: requiredString(body.slug, "slug"),
               title: requiredString(body.title, "title"),
               detail: typeof body.detail === "string" ? body.detail : "",
-              parentSlug: body.parentSlug === null || body.parentSlug === undefined ? null : requiredString(body.parentSlug, "parentSlug"),
+              ...questionRelations(body),
               actor: typeof body.actor === "string" && body.actor.trim() ? body.actor : "agent:cli",
             });
             broadcast(getOutline(db));
@@ -222,9 +225,11 @@ export async function startServer(options: StartServerOptions): Promise<DvizServ
                 slug: requiredString(body.slug, "slug"),
                 title: requiredString(body.title, "title"),
                 detail: typeof body.detail === "string" ? body.detail : "",
-                parentSlug: body.parentSlug === null || body.parentSlug === undefined ? null : requiredString(body.parentSlug, "parentSlug"),
+                ...questionRelations(body),
                 actor,
               });
+            } else if (action === "question.move") {
+              result = moveQuestion(db, requiredString(body.questionSlug, "questionSlug"), requiredString(body.after, "after"), actor);
             } else if (action === "question.update") {
               result = updateQuestion(db, requiredString(body.questionSlug, "questionSlug"), {
                 slug: typeof body.slug === "string" ? body.slug : undefined,
@@ -263,10 +268,12 @@ export async function startServer(options: StartServerOptions): Promise<DvizServ
                 description: typeof body.description === "string" ? body.description : "",
                 actor,
               });
-            } else if (action === "place") {
-              result = addPlacement(db, {
-                childSlug: requiredString(body.childSlug, "childSlug"),
-                parentSlug: requiredString(body.parentSlug, "parentSlug"),
+            } else if (action === "relation.add") {
+              result = addRelation(db, {
+                kind: validateRelationKind(requiredString(body.kind, "kind")),
+                from: requiredString(body.from, "from"),
+                to: requiredString(body.to, "to"),
+                note: typeof body.note === "string" ? body.note : "",
                 actor,
               });
             } else if (action === "assess") {
@@ -289,8 +296,8 @@ export async function startServer(options: StartServerOptions): Promise<DvizServ
               });
             } else if (action === "accept" || action === "remove") {
               const kind = body.kind as EntityKind;
-              if (!(["question", "option", "criterion", "assessment", "relation", "placement"] as string[]).includes(kind)) {
-                throw new Error("kind must be question, option, criterion, assessment, relation, or placement.");
+              if (!(["question", "option", "criterion", "assessment", "relation", "relevance"] as string[]).includes(kind)) {
+                throw new Error("kind must be question, option, criterion, assessment, relation, or relevance.");
               }
               const reference = requiredString(body.reference, "reference");
               if (action === "accept") acceptEntity(db, kind, reference, actor);

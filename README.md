@@ -56,6 +56,8 @@ dviz outline --db /path/to/project/.dviz/space.db
 
 `DVIZ_DB` is still supported for this mode; do not combine it with `--space` or `DVIZ_SPACE`. `dviz init --db PATH` still creates a standalone database. Existing maps are not listed in the personal library and are not moved, copied, or deleted automatically. Stop an older server before starting its replacement.
 
+Schema v4 upgrades v3 spaces when opened: existing nesting becomes `part-of` relations, preserving data and acceptance, and canonical outline order becomes the flat question order. Each upgrade runs in one transaction and logs a migration entry. Populated pre-slug spaces are still refused. Back up spaces before upgrading; older dviz versions cannot open v4.
+
 For development, `cd dviz && bun run dev` serves the library with live UI updates and the `?fixture=dinner` demo. Run `bun test` and `bun run typecheck` in `dviz/`.
 
 ## Decision Mode

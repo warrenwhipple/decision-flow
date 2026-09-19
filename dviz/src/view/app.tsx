@@ -1,3 +1,4 @@
+import { relationGroups } from "../db/relations.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SpaceSummary } from "../db/library.ts";
 import { createRoot } from "react-dom/client";
@@ -8,7 +9,7 @@ import type {
   Focus,
   Option,
   OutlineSnapshot,
-  Placement,
+  QuestionRelation,
   Question,
 } from "../db/space.ts";
 
@@ -23,103 +24,106 @@ type Connection = "connecting" | "live" | "offline" | "demo";
 const resolutionGlyph = { open: "○", leaning: "◐", decided: "●" } as const;
 const polarityLabel = { "+": "supports", "-": "detracts", "~": "mixed", "?": "unclear" } as const;
 const emptySnapshot: OutlineSnapshot = {
-  questions: [], placements: [], options: [], criteria: [], assessments: [], relations: [], focus: null,
+  questions: [], relevances: [], options: [], criteria: [], assessments: [], relations: [], focus: null,
 };
 
 function isFocused(focus: Focus | null, kind: Focus["kind"], reference: string): boolean {
   return focus?.kind === kind && focus.reference === reference;
 }
 
-function QuestionCard({ question, placement, options, focus, onOpen }: {
+function QuestionCard({ question, relations, options, focus, onOpen }: {
   question: Question;
-  placement: Placement;
+  relations: QuestionRelation[];
   options: Option[];
   focus: Focus | null;
   onOpen: (slug: string) => void;
 }) {
   const selected = options.find(({ slug }) => slug === question.resolvedOptionSlug);
-  const suggested = question.acceptance === "suggested" || placement.acceptance === "suggested";
+  const suggested = question.acceptance === "suggested";
   return (
     <div className="decision-entry">
-      <button
+      <article
         className={`question-card ${suggested ? "suggested" : "accepted"} ${question.resolution} ${isFocused(focus, "question", question.slug) ? "focus-target" : ""}`}
-        type="button"
-        onClick={() => onOpen(question.slug)}
-        aria-label={`Open decision ${question.title}`}
         data-node-kind="question"
         data-node-reference={question.slug}
       >
-        <span className="slug-chip question-slug">{question.slug}</span>
-        <span className="question-copy">
-          <span className="question-title">{question.title}</span>
-          {selected && question.resolution !== "open" && (
-            <span className="selected-option">
-              {question.resolution === "decided" ? "Decided" : "Leaning"}: {selected.slug}
+        <button className="question-open" type="button" onClick={() => onOpen(question.slug)} aria-label={`Open decision ${question.title}`}>
+          <span className="slug-chip question-slug">{question.slug}</span>
+          <span className="question-copy">
+            <span className="question-title">{question.title}</span>
+            {selected && question.resolution !== "open" && (
+              <span className="selected-option">
+                {question.resolution === "decided" ? "Decided" : "Leaning"}: {selected.slug}
+              </span>
+            )}
+          </span>
+          <span className="resolution" aria-label={`${question.resolution} question`}>
+            {resolutionGlyph[question.resolution]}
+          </span>
+          <span className="open-cue" aria-hidden="true">›</span>
+          {options.length > 0 && (
+            <span className="option-list" role="list" aria-label={`Options for ${question.title}`}>
+              {options.map((option) => (
+                <span
+                  className={`slug-chip option-slug option-chip ${option.acceptance} ${option.slug === question.resolvedOptionSlug ? "selected" : ""} ${isFocused(focus, "option", `${question.slug}/${option.slug}`) ? "focus-target" : ""}`}
+                  key={option.slug}
+                  role="listitem"
+                  title={option.title}
+                  data-node-kind="option"
+                  data-node-reference={`${question.slug}/${option.slug}`}
+                >
+                  {option.slug}
+                </span>
+              ))}
             </span>
           )}
-        </span>
-        <span className="resolution" aria-label={`${question.resolution} question`}>
-          {resolutionGlyph[question.resolution]}
-        </span>
-        <span className="open-cue" aria-hidden="true">›</span>
-        {options.length > 0 && (
-          <span className="option-list" role="list" aria-label={`Options for ${question.title}`}>
-            {options.map((option) => (
-              <span
-                className={`slug-chip option-slug option-chip ${option.acceptance} ${option.slug === question.resolvedOptionSlug ? "selected" : ""} ${isFocused(focus, "option", `${question.slug}/${option.slug}`) ? "focus-target" : ""}`}
-                key={option.slug}
-                role="listitem"
-                title={option.title}
-                data-node-kind="option"
-                data-node-reference={`${question.slug}/${option.slug}`}
-              >
-                {option.slug}
-              </span>
-            ))}
-          </span>
-        )}
-      </button>
+        </button>
+        <ListRelations relations={relations} slug={question.slug} />
+      </article>
     </div>
   );
 }
 
-function TransclusionCard({ question, placement, canonicalParent, onOpen }: {
-  question: Question;
-  placement: Placement;
-  canonicalParent: string | null;
-  onOpen: (slug: string) => void;
-}) {
-  const suggested = question.acceptance === "suggested" || placement.acceptance === "suggested";
-  const location = canonicalParent ?? "top level";
-  return (
-    <button
-      className={`transclusion-card ${suggested ? "suggested" : "accepted"}`}
-      type="button"
-      onClick={() => onOpen(question.slug)}
-      aria-label={`Open transcluded decision ${question.title}, also under ${location}`}
-    >
-      <span className="transclusion-icon" aria-hidden="true">↳</span>
-      <span className="slug-chip question-slug">{question.slug}</span>
-      <span className="transclusion-marker">also under <strong>{location}</strong></span>
-      <span className="open-cue" aria-hidden="true">›</span>
-    </button>
-  );
+function ListRelations({ relations, slug }: { relations: QuestionRelation[]; slug: string }) {
+  const groups = relationGroups(relations, slug).filter(({ label }) => ["part of", "raised by", "blocked by"].includes(label));
+  if (!groups.length) return null;
+  return <div className="relation-chips">{groups.flatMap(({ label, entries }) => entries.map(({ reference, relation }) => (
+    <span className="relation-context" key={`${relation.kind}:${reference}`} title={`${slug} ${label} ${reference}${relation.note ? ` — ${relation.note}` : ""}`}>
+      <span className="relation-label">{label}</span>
+      <span className={`slug-chip ${label === "raised by" ? "option-slug" : "question-slug"} relation-chip ${relation.acceptance}`}>{reference}</span>
+    </span>
+  )))}</div>;
 }
 
-function Outline({ snapshot, onOpen, space }: { snapshot: OutlineSnapshot; onOpen: (slug: string) => void; space?: string }) {
-  const questionsBySlug = useMemo(
-    () => new Map(snapshot.questions.map((question) => [question.slug, question])),
-    [snapshot.questions],
-  );
-  const childrenByParent = useMemo(() => {
-    const children = new Map<string | null, Placement[]>();
-    for (const placement of snapshot.placements) {
-      const siblings = children.get(placement.parentSlug) ?? [];
-      siblings.push(placement);
-      children.set(placement.parentSlug, siblings);
-    }
-    return children;
-  }, [snapshot.placements]);
+function RelationLink({ reference, relation, onOpen }: { reference: string; relation: QuestionRelation; onOpen: (slug: string) => void }) {
+  const slug = reference.split("/")[0]!;
+  const url = new URL(window.location.href);
+  url.searchParams.set("question", slug);
+  return <a className={`slug-chip ${reference.includes("/") ? "option-slug" : "question-slug"} relation-chip ${relation.acceptance}`}
+    href={`${url.pathname}${url.search}`} title={relation.note || reference}
+    onClick={(event) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      onOpen(slug);
+    }}>{reference}</a>;
+}
+
+function DetailRelations({ relations, slug, onOpen }: { relations: QuestionRelation[]; slug: string; onOpen: (slug: string) => void }) {
+  const groups = relationGroups(relations, slug).filter(({ label }) => label !== "raises");
+  if (!groups.length) return null;
+  return <section className="detail-relations" aria-label="Relations">
+    <p className="section-label">Relations</p>
+    {groups.map(({ label, entries }) => <div className="relation-group" key={label}>
+      <span className="relation-label">{label}</span>
+      <div>{entries.map(({ reference, relation }) => <span className="relation-detail" key={`${relation.kind}:${reference}`}>
+        <RelationLink reference={reference} relation={relation} onOpen={onOpen} />
+        {relation.note && <span className="relation-note">{relation.note}</span>}
+      </span>)}</div>
+    </div>)}
+  </section>;
+}
+
+function QuestionList({ snapshot, onOpen, space }: { snapshot: OutlineSnapshot; onOpen: (slug: string) => void; space?: string }) {
   const optionsByQuestion = useMemo(() => {
     const options = new Map<string, Option[]>();
     for (const option of snapshot.options) {
@@ -129,52 +133,15 @@ function Outline({ snapshot, onOpen, space }: { snapshot: OutlineSnapshot; onOpe
     }
     return options;
   }, [snapshot.options]);
-  const canonicalByQuestion = useMemo(
-    () => new Map(snapshot.placements.filter(({ canonical }) => canonical).map((placement) => [placement.childSlug, placement])),
-    [snapshot.placements],
-  );
-
-  const renderBranch = (parentSlug: string | null, ancestors = new Set<string>()) => {
-    const placements = childrenByParent.get(parentSlug) ?? [];
-    return placements.map((placement) => {
-      const childSlug = placement.childSlug;
-      const question = questionsBySlug.get(childSlug);
-      if (!question || ancestors.has(childSlug)) return null;
-      if (!placement.canonical) {
-        return (
-          <li key={`${parentSlug ?? "root"}-${childSlug}`}>
-            <TransclusionCard
-              question={question}
-              placement={placement}
-              canonicalParent={canonicalByQuestion.get(childSlug)?.parentSlug ?? null}
-              onOpen={onOpen}
-            />
-          </li>
-        );
-      }
-      const nextAncestors = new Set(ancestors).add(childSlug);
-      const children = renderBranch(childSlug, nextAncestors);
-      return (
-        <li key={`${parentSlug ?? "root"}-${childSlug}`}>
-          <QuestionCard
-            question={question}
-            placement={placement}
-            options={optionsByQuestion.get(childSlug) ?? []}
-            focus={snapshot.focus}
-            onOpen={onOpen}
-          />
-          {children.length > 0 && <ol>{children}</ol>}
-        </li>
-      );
-    });
-  };
-
-  const roots = renderBranch(null);
+  const cards = snapshot.questions.map((question) => <li key={question.slug}>
+    <QuestionCard question={question} relations={snapshot.relations} options={optionsByQuestion.get(question.slug) ?? []}
+      focus={snapshot.focus} onOpen={onOpen} />
+  </li>);
   const focusedCriterion = snapshot.focus?.kind === "criterion"
     ? snapshot.criteria.find(({ slug }) => slug === snapshot.focus?.reference)
     : undefined;
   const focusedCriterionHasContext = snapshot.focus?.kind === "criterion" && (
-    snapshot.relations.some(({ criterionSlug }) => criterionSlug === snapshot.focus?.reference)
+    snapshot.relevances.some(({ criterionSlug }) => criterionSlug === snapshot.focus?.reference)
     || snapshot.assessments.some(({ criterionSlug }) => criterionSlug === snapshot.focus?.reference)
   );
   const unplacedFocus = focusedCriterion && !focusedCriterionHasContext ? (
@@ -185,7 +152,7 @@ function Outline({ snapshot, onOpen, space }: { snapshot: OutlineSnapshot; onOpe
     </aside>
   ) : null;
 
-  if (roots.length === 0) {
+  if (cards.length === 0) {
     return (
       <>
         {unplacedFocus}
@@ -200,7 +167,7 @@ function Outline({ snapshot, onOpen, space }: { snapshot: OutlineSnapshot; onOpe
   return (
     <>
       {unplacedFocus}
-      <ol className="outline">{roots}</ol>
+      <ol className="question-list">{cards}</ol>
     </>
   );
 }
@@ -241,19 +208,20 @@ function AssessmentRow({ assessment, criterion }: { assessment: Assessment; crit
   );
 }
 
-function DecisionView({ snapshot, question, onBack }: {
+function DecisionView({ snapshot, question, onBack, onOpen }: {
   snapshot: OutlineSnapshot;
   question: Question;
   onBack: () => void;
+  onOpen: (slug: string) => void;
 }) {
   const options = snapshot.options.filter(({ questionSlug }) => questionSlug === question.slug);
   const criteriaBySlug = new Map(snapshot.criteria.map((criterion) => [criterion.slug, criterion]));
-  const relations = snapshot.relations.filter(({ questionSlug }) => questionSlug === question.slug);
+  const relevances = snapshot.relevances.filter(({ questionSlug }) => questionSlug === question.slug);
   const assessments = snapshot.assessments.filter(({ optionPath }) => optionPath.startsWith(`${question.slug}/`));
   const assessmentSlugs = new Set(assessments.map(({ criterionSlug }) => criterionSlug));
-  const relationByCriterion = new Map(relations.map((relation) => [relation.criterionSlug, relation]));
+  const relevanceByCriterion = new Map(relevances.map((relevance) => [relevance.criterionSlug, relevance]));
   const shownCriteria = snapshot.criteria.filter(
-    ({ slug }) => relationByCriterion.has(slug) || assessmentSlugs.has(slug),
+    ({ slug }) => relevanceByCriterion.has(slug) || assessmentSlugs.has(slug),
   );
 
   return (
@@ -274,6 +242,7 @@ function DecisionView({ snapshot, question, onBack }: {
         {question.detail && <p className="decision-detail">{question.detail}</p>}
       </div>
 
+      <DetailRelations relations={snapshot.relations} slug={question.slug} onOpen={onOpen} />
       {shownCriteria.length > 0 && (
         <section className="criteria-context" aria-labelledby="criteria-title">
           <div>
@@ -284,7 +253,7 @@ function DecisionView({ snapshot, question, onBack }: {
             {shownCriteria.map((criterion) => (
               <CriterionChip
                 criterion={criterion}
-                acceptance={relationByCriterion.get(criterion.slug)?.acceptance}
+                acceptance={relevanceByCriterion.get(criterion.slug)?.acceptance}
                 isFocused={isFocused(snapshot.focus, "criterion", criterion.slug)}
                 key={criterion.slug}
               />
@@ -321,6 +290,16 @@ function DecisionView({ snapshot, question, onBack }: {
                   </div>
                   <h3>{option.title}</h3>
                   {option.detail && <p className="option-detail">{option.detail}</p>}
+                  {snapshot.relations.some((r) => r.kind === "raises" && r.from === `${question.slug}/${option.slug}`) && (
+                    <div className="option-raises"><span className="relation-label">Raises</span>
+                      {snapshot.relations.filter((r) => r.kind === "raises" && r.from === `${question.slug}/${option.slug}`).map((relation) => (
+                        <span className="relation-detail" key={relation.to}>
+                          <RelationLink reference={relation.to} relation={relation} onOpen={onOpen} />
+                          {relation.note && <span className="relation-note">{relation.note}</span>}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {optionAssessments.length > 0 ? (
                     <ul className="assessment-list" aria-label={`Assessments for ${option.title}`}>
                       {optionAssessments.map((assessment) => {
@@ -354,7 +333,7 @@ function fixtureFromUrl(): string | null {
 function questionForFocus(snapshot: OutlineSnapshot, focus: Focus): string | null {
   if (focus.kind === "question") return null;
   if (focus.kind === "option") return focus.reference.split("/", 1)[0] ?? null;
-  const relation = snapshot.relations.find(({ criterionSlug }) => criterionSlug === focus.reference);
+  const relation = snapshot.relevances.find(({ criterionSlug }) => criterionSlug === focus.reference);
   if (relation) return relation.questionSlug;
   const assessment = snapshot.assessments.find(({ criterionSlug }) => criterionSlug === focus.reference);
   return assessment?.optionPath.split("/", 1)[0] ?? null;
@@ -478,7 +457,7 @@ function App({ space, title }: { space?: string; title?: string }) {
     };
 
     if (fixture) {
-      fetch(`/api/fixtures/${encodeURIComponent(fixture)}`)
+      fetch(`/api/fixtures/${encodeURIComponent(fixture)}?${new URLSearchParams({ shape: new URL(window.location.href).searchParams.get("shape") ?? "" })}`)
         .then(async (response) => {
           if (!response.ok) {
             connect();
@@ -580,7 +559,7 @@ function App({ space, title }: { space?: string; title?: string }) {
       <header>
         <div>
           <p className="eyebrow">Decision Flow</p>
-          <h1>{title ?? (zoomed ? "Decision" : "Live outline")}</h1>
+          <h1>{title ?? (zoomed ? "Decision" : "Live decisions")}</h1>
           {space && <p className="space-target">Agent target: <code>--space {space}</code></p>}
         </div>
         <div className="header-tools">
@@ -598,7 +577,7 @@ function App({ space, title }: { space?: string; title?: string }) {
         />
       )}
       {question ? (
-        <DecisionView snapshot={snapshot} question={question} onBack={() => navigate(null)} />
+        <DecisionView snapshot={snapshot} question={question} onBack={() => navigate(null)} onOpen={navigate} />
       ) : selectedQuestion ? (
         <section className="missing-decision">
           <p>Decision <code>{selectedQuestion}</code> is not in this space.</p>
@@ -606,7 +585,7 @@ function App({ space, title }: { space?: string; title?: string }) {
         </section>
       ) : (
         <section aria-live="polite">
-          <Outline snapshot={snapshot} onOpen={(slug) => navigate(slug)} space={space} />
+          <QuestionList snapshot={snapshot} onOpen={(slug) => navigate(slug)} space={space} />
         </section>
       )}
       {snapshot.focus && (
