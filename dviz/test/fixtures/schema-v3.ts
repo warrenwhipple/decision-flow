@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 3;
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS questions (
@@ -11,25 +11,18 @@ CREATE TABLE IF NOT EXISTS questions (
   resolution TEXT NOT NULL DEFAULT 'open'
     CHECK (resolution IN ('open', 'leaning', 'decided')),
   resolved_option_id INTEGER REFERENCES options(id),
-  position REAL NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS relations (
-  id INTEGER PRIMARY KEY,
-  kind TEXT NOT NULL CHECK (kind IN ('raises', 'part-of', 'blocks')),
-  from_kind TEXT NOT NULL CHECK (from_kind IN ('question', 'option')),
-  from_id INTEGER NOT NULL,
-  to_id INTEGER NOT NULL REFERENCES questions(id),
-  note TEXT NOT NULL DEFAULT '',
+CREATE TABLE IF NOT EXISTS question_parents (
+  child_id INTEGER NOT NULL REFERENCES questions(id),
+  parent_id INTEGER REFERENCES questions(id),
+  position REAL NOT NULL,
   acceptance TEXT NOT NULL DEFAULT 'suggested'
     CHECK (acceptance IN ('suggested', 'accepted')),
-  created_at TEXT NOT NULL,
-  UNIQUE (kind, from_kind, from_id, to_id)
+  UNIQUE (child_id, parent_id)
 );
-CREATE INDEX IF NOT EXISTS relations_to ON relations(to_id, kind);
-CREATE INDEX IF NOT EXISTS relations_from ON relations(from_kind, from_id, kind);
 
 CREATE TABLE IF NOT EXISTS options (
   id INTEGER PRIMARY KEY,
@@ -91,7 +84,8 @@ CREATE TABLE IF NOT EXISTS edits (
   payload TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS questions_position ON questions(position);
+CREATE INDEX IF NOT EXISTS question_parents_parent_position
+  ON question_parents(parent_id, position);
 CREATE INDEX IF NOT EXISTS options_question_position
   ON options(question_id, position);
 CREATE INDEX IF NOT EXISTS edits_ts ON edits(ts);

@@ -29,7 +29,8 @@ Usage:
   dviz init SLUG "TITLE"              alias for space create
   dviz init --db PATH                 initialize a legacy standalone database
   dviz serve [--db PATH] [--port PORT] [--dev]
-  dviz question add SLUG "TITLE" [--parent QSLUG] [--detail TEXT]
+  dviz question add SLUG "TITLE" [--part-of QSLUG] [--raised-by QSLUG/OSLUG] [--after QSLUG | --first] [--detail TEXT]
+  dviz question move QSLUG (--after QSLUG | --first)
   dviz question update QSLUG [--slug NEW] [--title TEXT] [--detail TEXT]
   dviz question lean QSLUG --option OSLUG
   dviz question decide QSLUG --option OSLUG
@@ -37,13 +38,13 @@ Usage:
   dviz option add --question QSLUG SLUG "TITLE" [--detail TEXT]
   dviz option update QSLUG/OSLUG [--slug NEW] [--title TEXT] [--detail TEXT]
   dviz criterion add CSLUG [--desc TEXT]
-  dviz place --question CHILD_QSLUG --parent PARENT_QSLUG
+  dviz relation add raises|part-of|blocks FROM TO [--note TEXT]
   dviz assess --option QSLUG/OSLUG --criterion CSLUG --polarity +|-|~|? [--note TEXT]
   dviz relate --question QSLUG --criterion CSLUG
   dviz accept KIND SLUG
   dviz remove KIND SLUG
   dviz focus KIND SLUG
-  dviz outline [--depth N] [--around QSLUG]
+  dviz outline [--around QSLUG] [--hops N]
   dviz show KIND SLUG
   dviz log [--since EDIT_ID|TIMESTAMP]
 
@@ -53,8 +54,8 @@ All server-backed commands accept --url URL (or DVIZ_URL).
 Explicit --db PATH (or DVIZ_DB) uses a legacy standalone server instead.
 --space and --db cannot be combined; there is no shared active space.
 Option references outside a named question use QSLUG/OSLUG.
-Edge references: assessment QSLUG/OSLUG:CSLUG, relation QSLUG:CSLUG,
-placement CHILD_QSLUG:PARENT_QSLUG (use CHILD_QSLUG:root at the root).
+Edge references: assessment QSLUG/OSLUG:CSLUG, relevance QSLUG:CSLUG,
+relation KIND:FROM:TO (FROM is QSLUG/OSLUG for raises, QSLUG otherwise).
 `;
 }
 
@@ -245,14 +246,24 @@ async function questionCommand(args: string[]): Promise<void> {
   const verb = args.shift();
   const clientInfo = client(args);
   if (verb === "add") {
-    const parentSlug = takeOption(args, "--parent") ?? null;
+    const partOf = takeOption(args, "--part-of");
+    const raisedBy = takeOption(args, "--raised-by");
+    const after = takeAfter(args);
     const detail = takeOption(args, "--detail") ?? "";
     if (args.length !== 2) throw new Error("`dviz question add` requires a slug and one quoted title.");
-    const result = await command(clientInfo, "question.add", { slug: args[0], title: args[1], detail, parentSlug }) as { slug: string; title: string };
+    const result = await command(clientInfo, "question.add", { slug: args[0], title: args[1], detail, partOf, raisedBy, after }) as { slug: string; title: string };
     console.log(`Added suggested question ${result.slug}: ${result.title}`);
     return;
   }
   const questionSlug = requireArgument(args.shift(), "question slug");
+  if (verb === "move") {
+    const after = takeAfter(args);
+    if (after === undefined) throw new Error("question move requires --after QSLUG or --first.");
+    assertNoExtraArgs(args);
+    await command(clientInfo, "question.move", { questionSlug, after });
+    console.log(`Moved question ${questionSlug}`);
+    return;
+  }
   if (verb === "update") {
     const slug = takeOption(args, "--slug");
     const title = takeOption(args, "--title");
@@ -275,7 +286,7 @@ async function questionCommand(args: string[]): Promise<void> {
     console.log(`Reopened question ${questionSlug}`);
     return;
   }
-  throw new Error("Question command must be add, update, lean, decide, or reopen.");
+  throw new Error("Question command must be add, move, update, lean, decide, or reopen.");
 }
 
 async function optionCommand(args: string[]): Promise<void> {
@@ -331,18 +342,28 @@ async function relate(args: string[]): Promise<void> {
   console.log(`Related suggested criterion ${criterionSlug} to question ${questionSlug}`);
 }
 
-async function place(args: string[]): Promise<void> {
+function takeAfter(args: string[]): string | undefined {
+  const after = takeOption(args, "--after");
+  const first = takeFlag(args, "--first");
+  if (first && after !== undefined) throw new Error("Use either --after or --first.");
+  return first ? "first" : after;
+}
+
+async function relationCommand(args: string[]): Promise<void> {
+  if (args.shift() !== "add") throw new Error("Relation command must be add.");
   const clientInfo = client(args);
-  const childSlug = requireOption(args, "--question");
-  const parentSlug = requireOption(args, "--parent");
+  const note = takeOption(args, "--note");
+  const kind = requireArgument(args.shift(), "relation kind");
+  const from = requireArgument(args.shift(), "FROM");
+  const to = requireArgument(args.shift(), "TO");
   assertNoExtraArgs(args);
-  await command(clientInfo, "place", { childSlug, parentSlug });
-  console.log(`Placed suggested question ${childSlug} under ${parentSlug}`);
+  await command(clientInfo, "relation.add", { kind, from, to, note });
+  console.log(`Added suggested relation ${kind}:${from}:${to}`);
 }
 
 function parseKind(value: string | undefined): EntityKind {
-  if (!value || !(["question", "option", "criterion", "assessment", "relation", "placement"] as string[]).includes(value)) {
-    throw new Error("kind must be question, option, criterion, assessment, relation, or placement.");
+  if (!value || !(["question", "option", "criterion", "assessment", "relation", "relevance"] as string[]).includes(value)) {
+    throw new Error("kind must be question, option, criterion, assessment, relation, or relevance.");
   }
   return value as EntityKind;
 }
@@ -374,12 +395,14 @@ async function focus(args: string[]): Promise<void> {
 
 async function outline(args: string[]): Promise<void> {
   const clientInfo = client(args);
-  const depth = parsePositiveInteger(takeOption(args, "--depth"), "--depth");
+  const hopsValue = takeOption(args, "--hops");
+  const hops = hopsValue === undefined ? undefined : Number(hopsValue);
+  if (hops !== undefined && (!Number.isInteger(hops) || hops < 0)) throw new Error("--hops must be a non-negative integer.");
   const around = takeOption(args, "--around");
   const ids = takeFlag(args, "--ids");
   assertNoExtraArgs(args);
   const query = new URLSearchParams();
-  if (depth !== undefined) query.set("depth", String(depth));
+  if (hops !== undefined) query.set("hops", String(hops));
   if (around !== undefined) query.set("around", around);
   if (ids) query.set("ids", "");
   const response = await request(clientInfo, `/api/outline.md${query.size ? `?${query}` : ""}`);
@@ -417,7 +440,7 @@ async function main(): Promise<void> {
   if (commandName === "question") return questionCommand(args);
   if (commandName === "option") return optionCommand(args);
   if (commandName === "criterion") return criterionCommand(args);
-  if (commandName === "place") return place(args);
+  if (commandName === "relation") return relationCommand(args);
   if (commandName === "assess") return assess(args);
   if (commandName === "relate") return relate(args);
   if (commandName === "accept") return mutateEntity("accept", args);

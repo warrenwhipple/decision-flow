@@ -1,6 +1,6 @@
 ---
 name: dviz
-description: Drive the dviz decision-visualizer CLI during deliberation — capture questions, options, criteria, and assessments as live suggestions on my open outline view.
+description: Drive the dviz decision-visualizer CLI during deliberation — capture questions, options, criteria, and assessments as live suggestions on my open decision list.
 disable-model-invocation: true
 ---
 
@@ -14,11 +14,11 @@ Use `dviz space list` to discover maps. Establish which named space this convers
 
 When asked to create a map, use `dviz space create SPACE "Title"`; `dviz space open SPACE` prints its browser link. Share that link so I can open it. Space slugs follow the same format as node slugs and must be unique across the library. Space titles are readable labels. The sidebar's selected map is not an agent-routing signal.
 
-Existing repo-local maps can still be targeted with explicit `--db PATH` instead of `--space`; never combine the two modes or migrate saved maps without asking.
+Existing repo-local maps can still be targeted with explicit `--db PATH` instead of `--space`; never combine the two modes or move saved maps into the personal library without asking. Supported schema upgrades happen automatically when the server opens a map; v3 nesting is imported as suggested or accepted `part-of` relations with its existing acceptance preserved.
 
 ## Suggest, never settle
 
-Everything you create lands as `suggested` and renders dotted until I accept it. Capture freely — questions, options, criteria, assessments, placements — but `accept`, `lean`, `decide`, `reopen`, and `remove` are my verbs: issue them only when I say so in conversation, never from your own judgment of where we netted out.
+Everything you create lands as `suggested` and renders dotted until I accept it. Capture freely — questions, options, criteria, assessments, relations — but `accept`, `lean`, `decide`, `reopen`, and `remove` are my verbs: issue them only when I say so in conversation, never from your own judgment of where we netted out.
 
 ## Slugs are our shared vocabulary
 
@@ -30,6 +30,18 @@ A node's slug is the one handle we both use — you in commands, me in speech, t
 - A collision or format rejection means mint a better name and retry — never suffix.
 
 Refer to an option outside its question as `question-slug/option-slug`.
+
+## Relations
+
+Questions relate three ways. Use the fewest that are true; none is better than a guess.
+
+- `raises` — an option, if chosen, opens a question: `dviz question add braise-cut "Which cut?" --raised-by main-course/braise --space SPACE`. This is the default during live capture: most new questions come from an option we were just discussing.
+- `part-of` — a broad question is answered by narrower ones: `--part-of menu`. Use when I frame a topic, or when tidying.
+- `blocks` — one decision should wait on another: `dviz relation add blocks serve-time prep-order --note "…" --space SPACE`. Only when I say the order matters.
+
+New questions go after the last question related to that same containing question or raising option, or directly after the source question if none. With both flags, `part-of` determines the default position. Place explicitly with `--after QSLUG` or `--first`; reorder with `dviz question move`. Unrelated questions append. Relations land `suggested` like everything else.
+
+Re-read a neighborhood with `dviz outline --around QSLUG --hops N --space SPACE`. Question relations use `KIND:FROM:TO` references; question–criterion edges are called `relevance` (`accept relevance QSLUG:CSLUG` when I ask). The `relate` verb is unchanged.
 
 ## Keep focus with the conversation
 

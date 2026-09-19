@@ -1,3 +1,4 @@
+import { relationGroups } from "./relations.ts";
 import { Database } from "bun:sqlite";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, parse, resolve } from "node:path";
@@ -12,7 +13,7 @@ export type Acceptance = "suggested" | "accepted";
 export type Resolution = "open" | "leaning" | "decided";
 export type Polarity = "+" | "-" | "~" | "?";
 export type NodeKind = "question" | "option" | "criterion";
-export type EntityKind = NodeKind | "assessment" | "relation" | "placement";
+export type EntityKind = NodeKind | "assessment" | "relevance" | "relation";
 
 export type Question = {
   slug: string;
@@ -21,16 +22,19 @@ export type Question = {
   acceptance: Acceptance;
   resolution: Resolution;
   resolvedOptionSlug: string | null;
+  position: number;
   createdAt: string;
   updatedAt: string;
 };
 
-export type Placement = {
-  childSlug: string;
-  parentSlug: string | null;
-  position: number;
+export type RelationKind = "raises" | "part-of" | "blocks";
+export type QuestionRelation = {
+  kind: RelationKind;
+  fromKind: "question" | "option";
+  from: string;
+  to: string;
+  note: string;
   acceptance: Acceptance;
-  canonical: boolean;
 };
 
 export type Option = {
@@ -60,7 +64,7 @@ export type Assessment = {
   acceptance: Acceptance;
 };
 
-export type Relation = {
+export type Relevance = {
   questionSlug: string;
   criterionSlug: string;
   acceptance: Acceptance;
@@ -83,11 +87,11 @@ export type Edit = {
 
 export type OutlineSnapshot = {
   questions: Question[];
-  placements: Placement[];
+  relations: QuestionRelation[];
   options: Option[];
   criteria: Criterion[];
   assessments: Assessment[];
-  relations: Relation[];
+  relevances: Relevance[];
   focus: Focus | null;
 };
 
@@ -95,7 +99,9 @@ export type AddQuestionInput = {
   slug: string;
   title: string;
   detail?: string;
-  parentSlug?: string | null;
+  partOf?: string;
+  raisedBy?: string;
+  after?: string;
   actor: string;
 };
 
@@ -146,30 +152,68 @@ function migrate(db: Database): void {
   if (version > SCHEMA_VERSION) {
     throw new Error(`This decision space uses schema version ${version}, but this dviz supports ${SCHEMA_VERSION}.`);
   }
-  const needsSlugSchema = !tableColumns(db, "questions").includes("slug") || !tableColumns(db, "options").includes("slug");
+  if (version === SCHEMA_VERSION) return;
+  const hasQuestions = tableColumns(db, "questions").length > 0;
+  const needsSlugSchema = hasQuestions && (!tableColumns(db, "questions").includes("slug") || !tableColumns(db, "options").includes("slug"));
   if (needsSlugSchema) {
     const populated = ["questions", "options", "criteria", "edits"].some((table) => {
-      const row = db.query(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number };
-      return Number(row.count) > 0;
+      if (!tableColumns(db, table).length) return false;
+      return Number((db.query(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count) > 0;
     });
-    if (populated) {
-      throw new Error("This decision space predates slug handles and contains data. It was left unchanged because dviz will not invent permanent slugs; initialize a new space and re-add the data with explicit slugs.");
-    }
-    db.exec("PRAGMA foreign_keys = OFF;");
-    db.exec(`
-      DROP TABLE IF EXISTS focus;
-      DROP TABLE IF EXISTS assessments;
-      DROP TABLE IF EXISTS question_criteria;
-      DROP TABLE IF EXISTS question_parents;
-      DROP TABLE IF EXISTS options;
-      DROP TABLE IF EXISTS criteria;
-      DROP TABLE IF EXISTS questions;
-      DROP TABLE IF EXISTS edits;
-    `);
-    db.exec(SCHEMA);
-    db.exec("PRAGMA foreign_keys = ON;");
+    if (populated) throw new Error("This decision space predates slug handles and contains data. It was left unchanged because dviz will not invent permanent slugs; initialize a new space and re-add the data with explicit slugs.");
   }
-  db.exec(`PRAGMA user_version = ${SCHEMA_VERSION};`);
+  // Foreign keys may reference the pre-slug tables being replaced. Restore enforcement even on failure.
+  if (needsSlugSchema) db.exec("PRAGMA foreign_keys = OFF;");
+  let imported = false;
+  try {
+    db.transaction(() => {
+      if (needsSlugSchema) {
+        for (const table of ["focus", "assessments", "question_criteria", "question_parents", "relations", "options", "criteria", "questions", "edits"]) {
+          db.exec(`DROP TABLE IF EXISTS ${table}`);
+        }
+      }
+      const oldPlacements = tableColumns(db, "question_parents").length > 0;
+      if (hasQuestions && !needsSlugSchema && !tableColumns(db, "questions").includes("position")) {
+        db.exec("ALTER TABLE questions ADD COLUMN position REAL NOT NULL DEFAULT 0");
+      }
+      db.exec(SCHEMA);
+      if (oldPlacements) {
+        type OldPlacement = { rowid: number; child_id: number; parent_id: number | null; position: number };
+        const placements = db.query("SELECT rowid, child_id, parent_id, position FROM question_parents ORDER BY position, child_id, rowid").all() as OldPlacement[];
+        const canonical = new Map<number, OldPlacement>();
+        for (const row of placements) {
+          if (!canonical.has(row.child_id) || row.rowid < canonical.get(row.child_id)!.rowid) canonical.set(row.child_id, row);
+        }
+        const children = new Map<number | null, OldPlacement[]>();
+        for (const row of placements) {
+          if (canonical.get(row.child_id) !== row) continue;
+          children.set(row.parent_id, [...(children.get(row.parent_id) ?? []), row]);
+        }
+        const visited = new Set<number>();
+        const visit = (id: number) => {
+          if (visited.has(id)) return;
+          visited.add(id);
+          db.query("UPDATE questions SET position = ? WHERE id = ?").run(visited.size, id);
+          for (const child of children.get(id) ?? []) visit(child.child_id);
+        };
+        for (const root of children.get(null) ?? []) visit(root.child_id);
+        for (const row of db.query("SELECT id FROM questions ORDER BY id").all() as { id: number }[]) visit(row.id);
+        const ts = timestamp();
+        const result = db.query(`INSERT INTO relations (kind, from_kind, from_id, to_id, acceptance, created_at)
+          SELECT 'part-of', 'question', child_id, parent_id, acceptance, ? FROM question_parents WHERE parent_id IS NOT NULL`).run(ts);
+        db.exec("DROP TABLE question_parents");
+        appendEdit(db, "migration", "migrate", "space", null, {
+          from: version, to: 4, relations: result.changes,
+          note: "Old nesting imported as part-of, the closest neutral reading; re-tag as raises or blocks where appropriate.",
+        }, ts);
+        imported = true;
+      }
+      db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+    }).immediate();
+  } finally {
+    if (needsSlugSchema) db.exec("PRAGMA foreign_keys = ON;");
+  }
+  if (imported) console.error("dviz: migrated to v4; old nesting imported as part-of. Re-tag as raises or blocks where appropriate.");
 }
 
 export function initializeSpace(path: string): Database {
@@ -178,7 +222,6 @@ export function initializeSpace(path: string): Database {
   try {
     configure(db);
     db.exec("PRAGMA journal_mode = WAL;");
-    db.exec(SCHEMA);
     migrate(db);
     return db;
   } catch (error) {
@@ -271,7 +314,7 @@ function criterionRecord(db: Database, slugValue: string): InternalCriterion {
   return { id: Number(row.id), slug: String(row.slug) };
 }
 
-function nextPosition(db: Database, table: "question_parents" | "options", column: string, value: number | null): number {
+function nextPosition(db: Database, table: "options", column: string, value: number | null): number {
   const row = db.query(`SELECT COALESCE(MAX(position), 0) + 1 AS position FROM ${table} WHERE ${column} IS ?`)
     .get(value) as { position: number };
   return Number(row.position);
@@ -282,58 +325,121 @@ function collisionError(error: unknown, kind: "Question" | "Option" | "Criterion
   throw error;
 }
 
+function questionPosition(db: Database, after?: string, movingId?: number): number {
+  const rows = db.query("SELECT id, slug, position FROM questions WHERE id IS NOT ? ORDER BY position, id")
+    .all(movingId ?? null) as { id: number; slug: string; position: number }[];
+  if (after === "first") return (rows[0]?.position ?? 1) - 1;
+  if (after === undefined) return (rows.at(-1)?.position ?? 0) + 1;
+  const index = rows.findIndex(({ slug }) => slug === after);
+  if (index < 0) {
+    questionRecord(db, after);
+    throw new Error("A question cannot move after itself.");
+  }
+  const position = rows[index]!.position;
+  const next = rows[index + 1]?.position;
+  const result = next === undefined ? position + 1 : position + (next - position) / 2;
+  if (result === position || result === next) throw new Error("No position remains between these questions; choose another insertion point.");
+  return result;
+}
+
+function insertionAnchor(db: Database, input: AddQuestionInput): string | undefined {
+  if (input.after !== undefined) return input.after;
+  if (input.partOf) {
+    const parent = questionRecord(db, input.partOf);
+    const sibling = db.query(`SELECT q.slug FROM relations r JOIN questions q ON q.id = r.from_id
+      WHERE r.kind = 'part-of' AND r.to_id = ? ORDER BY q.position DESC, q.id DESC LIMIT 1`).get(parent.id) as { slug: string } | null;
+    return sibling?.slug ?? parent.slug;
+  }
+  if (input.raisedBy) {
+    const option = optionRecord(db, input.raisedBy);
+    const sibling = db.query(`SELECT q.slug FROM relations r JOIN questions q ON q.id = r.to_id
+      WHERE r.kind = 'raises' AND r.from_id = ? ORDER BY q.position DESC, q.id DESC LIMIT 1`).get(option.id) as { slug: string } | null;
+    return sibling?.slug ?? option.questionSlug;
+  }
+  return undefined;
+}
+
 export function addQuestion(db: Database, input: AddQuestionInput): Question {
   const title = input.title.trim();
   if (!title) throw new Error("Question title must not be empty.");
   const id = db.transaction(() => {
     const slug = validateSlug(input.slug, "Question slug");
-    const parent = input.parentSlug ? questionRecord(db, input.parentSlug) : null;
+    const position = questionPosition(db, insertionAnchor(db, input));
     const ts = timestamp();
     let result;
     try {
-      result = db.query("INSERT INTO questions (slug, title, detail, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
-        .run(slug, title, input.detail ?? "", ts, ts);
-    } catch (error) {
-      collisionError(error, "Question", slug);
-    }
+      result = db.query("INSERT INTO questions (slug, title, detail, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(slug, title, input.detail ?? "", position, ts, ts);
+    } catch (error) { collisionError(error, "Question", slug); }
     const questionId = Number(result.lastInsertRowid);
-    db.query("INSERT INTO question_parents (child_id, parent_id, position) VALUES (?, ?, ?)")
-      .run(questionId, parent?.id ?? null, nextPosition(db, "question_parents", "parent_id", parent?.id ?? null));
     appendEdit(db, input.actor, "add", "question", questionId, {
-      slug, title, detail: input.detail ?? "", parent: parent?.slug ?? "root", acceptance: "suggested",
+      slug, title, detail: input.detail ?? "", position, acceptance: "suggested",
     }, ts);
+    if (input.partOf) addRelation(db, { kind: "part-of", from: slug, to: input.partOf, actor: input.actor });
+    if (input.raisedBy) addRelation(db, { kind: "raises", from: input.raisedBy, to: slug, actor: input.actor });
     return questionId;
-  })();
+  }).immediate();
   return getQuestionById(db, id);
 }
 
-export function addPlacement(db: Database, input: { childSlug: string; parentSlug: string; actor: string }): Placement {
-  const placement = db.transaction(() => {
-    const child = questionRecord(db, input.childSlug);
-    const parent = questionRecord(db, input.parentSlug);
-    if (child.id === parent.id) throw new Error(`Question ${child.slug} cannot be placed under itself.`);
-    if (db.query("SELECT 1 FROM question_parents WHERE child_id = ? AND parent_id = ?").get(child.id, parent.id)) {
-      throw new Error(`Question ${child.slug} is already placed under ${parent.slug}.`);
+export function moveQuestion(db: Database, slug: string, after: string, actor: string): Question {
+  db.transaction(() => {
+    const question = questionRecord(db, slug);
+    const position = questionPosition(db, after, question.id);
+    const ts = timestamp();
+    db.query("UPDATE questions SET position = ?, updated_at = ? WHERE id = ?").run(position, ts, question.id);
+    appendEdit(db, actor, "move", "question", question.id, { slug, after, position }, ts);
+  }).immediate();
+  return getQuestion(db, slug);
+}
+
+export function validateRelationKind(value: string): RelationKind {
+  if (value !== "raises" && value !== "part-of" && value !== "blocks") throw new Error("Relation kind must be raises, part-of, or blocks.");
+  return value;
+}
+
+function relationEndpoints(db: Database, kind: RelationKind, from: string, to: string) {
+  if (kind === "raises" && !from.includes("/")) throw new Error("raises requires an option path as FROM (QSLUG/OSLUG).");
+  if (kind !== "raises" && from.includes("/")) throw new Error(`${kind} requires a question as FROM.`);
+  const source = kind === "raises" ? optionRecord(db, from) : questionRecord(db, from);
+  const target = questionRecord(db, to);
+  return { source, target, fromKind: kind === "raises" ? "option" as const : "question" as const,
+    sourceQuestionId: kind === "raises" ? (source as InternalOption).questionId : source.id };
+}
+
+export function addRelation(db: Database, input: { kind: RelationKind; from: string; to: string; note?: string; actor: string }): QuestionRelation {
+  return db.transaction(() => {
+    const kind = validateRelationKind(input.kind);
+    const { source, target, fromKind, sourceQuestionId } = relationEndpoints(db, kind, input.from, input.to);
+    if (sourceQuestionId === target.id) throw new Error(`${kind} cannot relate a question to itself (including its own options).`);
+    if (db.query("SELECT 1 FROM relations WHERE kind = ? AND from_kind = ? AND from_id = ? AND to_id = ?").get(kind, fromKind, source.id, target.id)) {
+      throw new Error(`Relation ${kind}:${input.from}:${input.to} already exists.`);
     }
-    const createsCycle = db.query(`WITH RECURSIVE descendants(id) AS (
-      SELECT child_id FROM question_parents WHERE parent_id = ?
-      UNION
-      SELECT qp.child_id FROM question_parents qp JOIN descendants d ON qp.parent_id = d.id
-    ) SELECT 1 FROM descendants WHERE id = ? LIMIT 1`).get(child.id, parent.id);
-    if (createsCycle) throw new Error(`Placing ${child.slug} under ${parent.slug} would create a question cycle.`);
-    const position = nextPosition(db, "question_parents", "parent_id", parent.id);
-    db.query("INSERT INTO question_parents (child_id, parent_id, position) VALUES (?, ?, ?)")
-      .run(child.id, parent.id, position);
-    appendEdit(db, input.actor, "place", "placement", child.id, {
-      child: child.slug, parent: parent.slug, acceptance: "suggested",
-    });
-    return { childSlug: child.slug, parentSlug: parent.slug, position };
-  })();
-  const result = getOutline(db).placements.find(({ childSlug, parentSlug }) => (
-    childSlug === placement.childSlug && parentSlug === placement.parentSlug
-  ));
-  if (!result) throw new Error("Placement was not persisted.");
-  return result;
+    const cycle = db.query(`WITH RECURSIVE edges(source, target) AS (
+      SELECT CASE WHEN r.from_kind = 'option' THEN o.question_id ELSE r.from_id END, r.to_id
+      FROM relations r LEFT JOIN options o ON r.from_kind = 'option' AND o.id = r.from_id WHERE r.kind = ?
+    ), reachable(id) AS (
+      SELECT target FROM edges WHERE source = ?
+      UNION SELECT e.target FROM edges e JOIN reachable r ON e.source = r.id
+    ) SELECT 1 FROM reachable WHERE id = ? LIMIT 1`).get(kind, target.id, sourceQuestionId);
+    if (cycle) throw new Error(`${input.from} ${kind} ${input.to} would create a ${kind} cycle through ${input.to}.`);
+    const relation: QuestionRelation = { kind, fromKind, from: input.from, to: input.to, note: input.note ?? "", acceptance: "suggested" };
+    const result = db.query("INSERT INTO relations (kind, from_kind, from_id, to_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(kind, fromKind, source.id, target.id, relation.note, timestamp());
+    appendEdit(db, input.actor, "add", "relation", Number(result.lastInsertRowid), relation);
+    return relation;
+  }).immediate();
+}
+
+function relationRecord(db: Database, reference: string): { id: number } {
+  const parts = reference.split(":");
+  if (parts.length !== 3 || parts.some((part) => !part)) throw new Error("relation reference must use KIND:FROM:TO form.");
+  const kind = validateRelationKind(parts[0]!);
+  const { source, target, fromKind } = relationEndpoints(db, kind, parts[1]!, parts[2]!);
+  const row = db.query("SELECT id FROM relations WHERE kind = ? AND from_kind = ? AND from_id = ? AND to_id = ?")
+    .get(kind, fromKind, source.id, target.id) as { id: number } | null;
+  if (!row) throw new Error(`relation ${reference} was not found.`);
+  return row;
 }
 
 export function updateQuestion(db: Database, questionSlug: string, input: { slug?: string; title?: string; detail?: string; actor: string }): Question {
@@ -473,7 +579,7 @@ export function setAssessment(db: Database, input: { optionPath: string; criteri
   return getAssessment(db, input.optionPath, input.criterionSlug);
 }
 
-export function relateCriterion(db: Database, input: { questionSlug: string; criterionSlug: string; actor: string }): Relation {
+export function relateCriterion(db: Database, input: { questionSlug: string; criterionSlug: string; actor: string }): Relevance {
   const relation = db.transaction(() => {
     const question = questionRecord(db, input.questionSlug);
     const criterion = criterionRecord(db, input.criterionSlug);
@@ -481,23 +587,18 @@ export function relateCriterion(db: Database, input: { questionSlug: string; cri
       throw new Error(`Criterion ${criterion.slug} is already related to question ${question.slug}.`);
     }
     db.query("INSERT INTO question_criteria (question_id, criterion_id) VALUES (?, ?)").run(question.id, criterion.id);
-    appendEdit(db, input.actor, "relate", "relation", null, { question: question.slug, criterion: criterion.slug, acceptance: "suggested" });
+    appendEdit(db, input.actor, "relate", "relevance", null, { question: question.slug, criterion: criterion.slug, acceptance: "suggested" });
     return { question, criterion };
   })();
-  return getRelation(db, relation.question.id, relation.criterion.id);
+  return getRelevance(db, relation.question.id, relation.criterion.id);
 }
 
-function parseEdgeReference(kind: "assessment" | "relation" | "placement", reference: string): [string, string] {
+function parseEdgeReference(kind: "assessment" | "relevance", reference: string): [string, string] {
   const separator = reference.indexOf(":");
   if (separator < 1 || separator !== reference.lastIndexOf(":") || separator === reference.length - 1) {
     throw new Error(`${kind} reference must use FIRST:SECOND form.`);
   }
   return [reference.slice(0, separator), reference.slice(separator + 1)];
-}
-
-function placementRecord(db: Database, reference: string): { child: InternalQuestion; parent: InternalQuestion | null } {
-  const [childSlug, parentSlug] = parseEdgeReference("placement", reference);
-  return { child: questionRecord(db, childSlug), parent: parentSlug === "root" ? null : questionRecord(db, parentSlug) };
 }
 
 export function acceptEntity(db: Database, kind: EntityKind, reference: string, actor: string): void {
@@ -527,16 +628,16 @@ export function acceptEntity(db: Database, kind: EntityKind, reference: string, 
       const criterion = criterionRecord(db, criterionSlug);
       changes = db.query("UPDATE assessments SET acceptance = 'accepted' WHERE option_id = ? AND criterion_id = ? AND acceptance = 'suggested'").run(option.id, criterion.id).changes;
       payload = { option: optionPath(option.questionSlug, option.slug), criterion: criterion.slug };
-    } else if (kind === "relation") {
+    } else if (kind === "relevance") {
       const [questionSlug, criterionSlug] = parseEdgeReference(kind, reference);
       const question = questionRecord(db, questionSlug);
       const criterion = criterionRecord(db, criterionSlug);
       changes = db.query("UPDATE question_criteria SET acceptance = 'accepted' WHERE question_id = ? AND criterion_id = ? AND acceptance = 'suggested'").run(question.id, criterion.id).changes;
       payload = { question: question.slug, criterion: criterion.slug };
     } else {
-      const { child, parent } = placementRecord(db, reference);
-      changes = db.query("UPDATE question_parents SET acceptance = 'accepted' WHERE child_id = ? AND parent_id IS ? AND acceptance = 'suggested'").run(child.id, parent?.id ?? null).changes;
-      payload = { child: child.slug, parent: parent?.slug ?? "root" };
+      entityId = relationRecord(db, reference).id;
+      changes = db.query("UPDATE relations SET acceptance = 'accepted' WHERE id = ? AND acceptance = 'suggested'").run(entityId).changes;
+      payload = { reference };
     }
     if (changes === 0) throw new Error(`${kind} ${reference} was not found or is already accepted.`);
     appendEdit(db, actor, "accept", kind, entityId, payload, ts);
@@ -551,30 +652,25 @@ export function removeEntity(db: Database, kind: EntityKind, reference: string, 
     if (kind === "question") {
       const question = questionRecord(db, reference);
       entityId = question.id;
-      const children = db.query("SELECT child_id FROM question_parents WHERE parent_id = ?").all(question.id) as { child_id: number }[];
       const optionRows = db.query("SELECT id FROM options WHERE question_id = ?").all(question.id) as { id: number }[];
       for (const { id } of optionRows) {
         db.query("UPDATE questions SET resolution = 'open', resolved_option_id = NULL, updated_at = ? WHERE resolved_option_id = ?").run(timestamp(), id);
         db.query("DELETE FROM assessments WHERE option_id = ?").run(id);
+        db.query("DELETE FROM relations WHERE from_kind = 'option' AND from_id = ?").run(id);
         db.query("DELETE FROM focus WHERE kind = 'option' AND node_id = ?").run(id);
       }
       db.query("DELETE FROM question_criteria WHERE question_id = ?").run(question.id);
       db.query("DELETE FROM options WHERE question_id = ?").run(question.id);
-      db.query("DELETE FROM question_parents WHERE child_id = ? OR parent_id = ?").run(question.id, question.id);
+      db.query("DELETE FROM relations WHERE (from_kind = 'question' AND from_id = ?) OR to_id = ?").run(question.id, question.id);
       changes = db.query("DELETE FROM questions WHERE id = ?").run(question.id).changes;
       db.query("DELETE FROM focus WHERE kind = 'question' AND node_id = ?").run(question.id);
-      for (const { child_id } of children) {
-        if (!db.query("SELECT 1 FROM question_parents WHERE child_id = ? LIMIT 1").get(child_id)) {
-          db.query("INSERT INTO question_parents (child_id, parent_id, position) VALUES (?, NULL, ?)")
-            .run(child_id, nextPosition(db, "question_parents", "parent_id", null));
-        }
-      }
       payload = { slug: question.slug };
     } else if (kind === "option") {
       const option = optionRecord(db, reference);
       entityId = option.id;
       db.query("UPDATE questions SET resolution = 'open', resolved_option_id = NULL, updated_at = ? WHERE resolved_option_id = ?").run(timestamp(), option.id);
       db.query("DELETE FROM assessments WHERE option_id = ?").run(option.id);
+      db.query("DELETE FROM relations WHERE from_kind = 'option' AND from_id = ?").run(option.id);
       changes = db.query("DELETE FROM options WHERE id = ?").run(option.id).changes;
       db.query("DELETE FROM focus WHERE kind = 'option' AND node_id = ?").run(option.id);
       payload = { slug: optionPath(option.questionSlug, option.slug) };
@@ -592,19 +688,16 @@ export function removeEntity(db: Database, kind: EntityKind, reference: string, 
       const criterion = criterionRecord(db, criterionSlug);
       changes = db.query("DELETE FROM assessments WHERE option_id = ? AND criterion_id = ?").run(option.id, criterion.id).changes;
       payload = { option: optionPath(option.questionSlug, option.slug), criterion: criterion.slug };
-    } else if (kind === "relation") {
+    } else if (kind === "relevance") {
       const [questionSlug, criterionSlug] = parseEdgeReference(kind, reference);
       const question = questionRecord(db, questionSlug);
       const criterion = criterionRecord(db, criterionSlug);
       changes = db.query("DELETE FROM question_criteria WHERE question_id = ? AND criterion_id = ?").run(question.id, criterion.id).changes;
       payload = { question: question.slug, criterion: criterion.slug };
     } else {
-      const { child, parent } = placementRecord(db, reference);
-      changes = db.query("DELETE FROM question_parents WHERE child_id = ? AND parent_id IS ?").run(child.id, parent?.id ?? null).changes;
-      if (changes > 0 && !db.query("SELECT 1 FROM question_parents WHERE child_id = ? LIMIT 1").get(child.id)) {
-        db.query("INSERT INTO question_parents (child_id, parent_id, position) VALUES (?, NULL, ?)").run(child.id, nextPosition(db, "question_parents", "parent_id", null));
-      }
-      payload = { child: child.slug, parent: parent?.slug ?? "root" };
+      entityId = relationRecord(db, reference).id;
+      changes = db.query("DELETE FROM relations WHERE id = ?").run(entityId).changes;
+      payload = { reference };
     }
     if (changes === 0) throw new Error(`${kind} ${reference} was not found.`);
     appendEdit(db, actor, "remove", kind, entityId, payload);
@@ -655,7 +748,7 @@ export function getQuestion(db: Database, slug: string): Question {
 }
 
 function getQuestionById(db: Database, id: number): Question {
-  const row = db.query(`SELECT q.slug, q.title, q.detail, q.acceptance, q.resolution,
+  const row = db.query(`SELECT q.slug, q.title, q.detail, q.acceptance, q.resolution, q.position,
     o.slug AS resolved_option_slug, q.created_at, q.updated_at
     FROM questions q LEFT JOIN options o ON o.id = q.resolved_option_id WHERE q.id = ?`).get(id) as Record<string, unknown> | null;
   if (!row) throw new Error("Question does not exist.");
@@ -694,23 +787,25 @@ export function getAssessment(db: Database, pathValue: string, criterionSlugValu
   return mapAssessment(row);
 }
 
-function getRelation(db: Database, questionId: number, criterionId: number): Relation {
+function getRelevance(db: Database, questionId: number, criterionId: number): Relevance {
   const row = db.query(`SELECT q.slug AS question_slug, c.slug AS criterion_slug, qc.acceptance
     FROM question_criteria qc JOIN questions q ON q.id = qc.question_id
     JOIN criteria c ON c.id = qc.criterion_id WHERE qc.question_id = ? AND qc.criterion_id = ?`).get(questionId, criterionId) as Record<string, unknown> | null;
-  if (!row) throw new Error("Relation does not exist.");
+  if (!row) throw new Error("Relevance does not exist.");
   return { questionSlug: String(row.question_slug), criterionSlug: String(row.criterion_slug), acceptance: row.acceptance as Acceptance };
 }
 
 export function getOutline(db: Database): OutlineSnapshot {
-  const questionRows = db.query(`SELECT q.slug, q.title, q.detail, q.acceptance, q.resolution,
+  const questionRows = db.query(`SELECT q.slug, q.title, q.detail, q.acceptance, q.resolution, q.position,
     o.slug AS resolved_option_slug, q.created_at, q.updated_at FROM questions q
-    LEFT JOIN options o ON o.id = q.resolved_option_id ORDER BY q.id`).all() as Record<string, unknown>[];
-  const placementRows = db.query(`SELECT child.slug AS child_slug, parent.slug AS parent_slug,
-    qp.position, qp.acceptance,
-    qp.rowid = (SELECT MIN(candidate.rowid) FROM question_parents candidate WHERE candidate.child_id = qp.child_id) AS canonical
-    FROM question_parents qp JOIN questions child ON child.id = qp.child_id
-    LEFT JOIN questions parent ON parent.id = qp.parent_id ORDER BY qp.parent_id, qp.position, qp.child_id`).all() as Record<string, unknown>[];
+    LEFT JOIN options o ON o.id = q.resolved_option_id ORDER BY q.position, q.id`).all() as Record<string, unknown>[];
+  const typedRelations = db.query(`SELECT r.kind, r.from_kind, r.note, r.acceptance,
+    CASE WHEN r.from_kind = 'option' THEN owner.slug || '/' || o.slug ELSE source.slug END AS source,
+    target.slug AS target FROM relations r
+    LEFT JOIN questions source ON r.from_kind = 'question' AND source.id = r.from_id
+    LEFT JOIN options o ON r.from_kind = 'option' AND o.id = r.from_id
+    LEFT JOIN questions owner ON owner.id = o.question_id
+    JOIN questions target ON target.id = r.to_id ORDER BY r.id`).all() as Record<string, unknown>[];
   const optionRows = db.query(`SELECT q.slug AS question_slug, o.slug, o.title, o.detail, o.acceptance,
     o.position, o.created_at, o.updated_at FROM options o JOIN questions q ON q.id = o.question_id
     ORDER BY o.question_id, o.position, o.id`).all() as Record<string, unknown>[];
@@ -727,21 +822,19 @@ export function getOutline(db: Database): OutlineSnapshot {
     JOIN questions q ON q.id = o.question_id
     JOIN criteria c ON c.id = a.criterion_id
     ORDER BY o.question_id, o.position, c.slug`).all() as Record<string, unknown>[];
-  const relationRows = db.query(`SELECT q.slug AS question_slug, c.slug AS criterion_slug, qc.acceptance
+  const relevanceRows = db.query(`SELECT q.slug AS question_slug, c.slug AS criterion_slug, qc.acceptance
     FROM question_criteria qc
     JOIN questions q ON q.id = qc.question_id
     JOIN criteria c ON c.id = qc.criterion_id
     ORDER BY q.id, c.slug`).all() as Record<string, unknown>[];
   return {
     questions: questionRows.map(mapQuestion),
-    placements: placementRows.map((row) => ({
-      childSlug: String(row.child_slug), parentSlug: row.parent_slug === null ? null : String(row.parent_slug),
-      position: Number(row.position), acceptance: row.acceptance as Acceptance, canonical: Boolean(row.canonical),
-    })),
+    relations: typedRelations.map((row) => ({ kind: row.kind as RelationKind, fromKind: row.from_kind as "question" | "option",
+      from: String(row.source), to: String(row.target), note: String(row.note), acceptance: row.acceptance as Acceptance })),
     options: optionRows.map(mapOption),
     criteria: criterionRows.map(mapCriterion),
     assessments: assessmentRows.map(mapAssessment),
-    relations: relationRows.map((row) => ({
+    relevances: relevanceRows.map((row) => ({
       questionSlug: String(row.question_slug),
       criterionSlug: String(row.criterion_slug),
       acceptance: row.acceptance as Acceptance,
@@ -750,53 +843,32 @@ export function getOutline(db: Database): OutlineSnapshot {
   };
 }
 
-export function renderOutline(db: Database, options: { depth?: number; around?: string; ids?: boolean } = {}): string {
+export function renderOutline(db: Database, options: { hops?: number; around?: string; ids?: boolean } = {}): string {
   const snapshot = getOutline(db);
-  const questions = new Map(snapshot.questions.map((question) => [question.slug, question]));
-  const optionsByQuestion = new Map<string, Option[]>();
-  for (const option of snapshot.options) optionsByQuestion.set(option.questionSlug, [...(optionsByQuestion.get(option.questionSlug) ?? []), option]);
-  const children = new Map<string | null, Placement[]>();
-  for (const placement of snapshot.placements) children.set(placement.parentSlug, [...(children.get(placement.parentSlug) ?? []), placement]);
-  const canonicalPlacements = new Map(snapshot.placements.filter(({ canonical }) => canonical).map((placement) => [placement.childSlug, placement]));
-  const questionIds = options.ids
-    ? new Map((db.query("SELECT slug, id FROM questions").all() as { slug: string; id: number }[]).map((row) => [row.slug, Number(row.id)]))
-    : new Map<string, number>();
-  const optionIds = options.ids
-    ? new Map((db.query(`SELECT q.slug AS question_slug, o.slug AS option_slug, o.id FROM options o
-        JOIN questions q ON q.id = o.question_id`).all() as { question_slug: string; option_slug: string; id: number }[])
-      .map((row) => [optionPath(row.question_slug, row.option_slug), Number(row.id)]))
-    : new Map<string, number>();
-  const around = options.around === undefined ? undefined : validateSlug(options.around, "Question slug");
-  if (around !== undefined && !questions.has(around)) throw new Error(`Question ${around} does not exist.`);
-  const lines: string[] = [];
-  const render = (placement: Placement, level: number, ancestors: Set<string>) => {
-    if (options.depth !== undefined && level > options.depth) return;
-    const question = questions.get(placement.childSlug);
-    if (!question || ancestors.has(question.slug)) return;
-    const debugQuestion = options.ids ? ` Q${questionIds.get(question.slug)}` : "";
-    const canonical = canonicalPlacements.get(question.slug);
-    if (!placement.canonical) {
-      const canonicalParent = canonical?.parentSlug ?? "top level";
-      const suggestion = question.acceptance === "suggested" || placement.acceptance === "suggested" ? " [suggested]" : "";
-      lines.push(`${"  ".repeat(level)}- ↳ ${question.slug}${debugQuestion} (also under ${canonicalParent})${suggestion}`);
-      return;
+  const hops = options.hops ?? 1;
+  if (!Number.isInteger(hops) || hops < 0) throw new Error("hops must be a non-negative integer.");
+  let included: Set<string> | undefined;
+  if (options.around !== undefined) {
+    questionRecord(db, options.around);
+    included = new Set([options.around]);
+    let frontier = new Set(included);
+    for (let hop = 0; hop < hops && frontier.size; hop++) {
+      const next = new Set<string>();
+      for (const r of snapshot.relations) {
+        const from = r.fromKind === "option" ? r.from.split("/")[0]! : r.from;
+        if (frontier.has(from) && !included.has(r.to)) next.add(r.to);
+        if (frontier.has(r.to) && !included.has(from)) next.add(from);
+      }
+      for (const slug of next) included.add(slug);
+      frontier = next;
     }
-    const selected = question.resolvedOptionSlug === null ? "" : ` → ${question.resolvedOptionSlug}`;
-    const suggestion = question.acceptance === "suggested" || placement.acceptance === "suggested" ? " [suggested]" : "";
-    lines.push(`${"  ".repeat(level)}- ${resolutionGlyph(question.resolution)} ${question.slug}${debugQuestion}: ${question.title}${selected}${suggestion}`);
-    for (const option of optionsByQuestion.get(question.slug) ?? []) {
-      const debugOption = options.ids ? ` O${optionIds.get(optionPath(question.slug, option.slug))}` : "";
-      lines.push(`${"  ".repeat(level + 1)}- ${option.slug}${debugOption}${option.acceptance === "suggested" ? " [suggested]" : ""}`);
-    }
-    const next = new Set(ancestors).add(question.slug);
-    for (const child of children.get(question.slug) ?? []) render(child, level + 1, next);
-  };
-  if (around !== undefined) {
-    const placement = canonicalPlacements.get(around);
-    if (placement) render(placement, 0, new Set());
-  } else {
-    for (const placement of children.get(null) ?? []) render(placement, 0, new Set());
   }
+  const lines = snapshot.questions.filter((q) => !included || included.has(q.slug)).map((q) => {
+    const context = relationGroups(snapshot.relations, q.slug).map(({ label, entries }) =>
+      `${label}${label === "parts" ? ":" : ""} ${entries.map(({ reference, relation }) => `${reference}${relation.acceptance === "suggested" ? "?" : ""}`).join(", ")}`).join(" · ");
+    const debug = options.ids ? ` Q${questionRecord(db, q.slug).id}` : "";
+    return `- ${resolutionGlyph(q.resolution)} ${q.slug}${debug}: ${q.title}${q.resolvedOptionSlug ? ` → ${q.resolvedOptionSlug}` : ""}${q.acceptance === "suggested" ? " [suggested]" : ""}${context ? ` (${context})` : ""}`;
+  });
   return lines.length ? `${lines.join("\n")}\n` : "No questions yet.\n";
 }
 
@@ -804,9 +876,6 @@ export function renderEntity(db: Database, kind: NodeKind, reference: string): s
   if (kind === "question") {
     const record = questionRecord(db, reference);
     const question = getQuestionById(db, record.id);
-    const placements = db.query(`SELECT parent.slug AS parent_slug, qp.position, qp.acceptance
-      FROM question_parents qp LEFT JOIN questions parent ON parent.id = qp.parent_id
-      WHERE qp.child_id = ? ORDER BY qp.position`).all(record.id) as Record<string, unknown>[];
     const optionRows = db.query(`SELECT q.slug AS question_slug, o.slug, o.title, o.detail, o.acceptance,
       o.position, o.created_at, o.updated_at FROM options o JOIN questions q ON q.id = o.question_id
       WHERE o.question_id = ? ORDER BY o.position, o.id`).all(record.id) as Record<string, unknown>[];
@@ -815,7 +884,8 @@ export function renderEntity(db: Database, kind: NodeKind, reference: string): s
     const lines = [
       `# ${question.slug}: ${question.title}`, "", `Acceptance: ${question.acceptance}`,
       `Resolution: ${question.resolution}${question.resolvedOptionSlug ? ` → ${question.resolvedOptionSlug}` : ""}`,
-      `Parents: ${placements.map((row) => `${row.parent_slug === null ? "root" : row.parent_slug} (${row.acceptance})`).join(", ") || "none"}`,
+      ...relationGroups(getOutline(db).relations, question.slug).map(({ label, entries }) =>
+        `${label[0]!.toUpperCase()}${label.slice(1)}: ${entries.map(({ reference, relation }) => `${reference} [${relation.acceptance}]${relation.note ? ` — ${relation.note}` : ""}`).join(", ")}`),
     ];
     if (question.detail) lines.push("", question.detail);
     lines.push("", "## Options");
@@ -890,7 +960,7 @@ function resolutionGlyph(resolution: Resolution): string {
 function mapQuestion(row: Record<string, unknown>): Question {
   return {
     slug: String(row.slug), title: String(row.title), detail: String(row.detail), acceptance: row.acceptance as Acceptance,
-    resolution: row.resolution as Resolution, resolvedOptionSlug: row.resolved_option_slug === null ? null : String(row.resolved_option_slug),
+    position: Number(row.position), resolution: row.resolution as Resolution, resolvedOptionSlug: row.resolved_option_slug === null ? null : String(row.resolved_option_slug),
     createdAt: String(row.created_at), updatedAt: String(row.updated_at),
   };
 }
